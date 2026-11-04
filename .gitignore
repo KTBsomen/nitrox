@@ -1,6 +1,8 @@
 # Generated files
 /target/
 Cargo.lock
+Cargo.toml.orig
+.cargo_vcs_info.json
 
 # IDE
 .idea/
