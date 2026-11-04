@@ -140,7 +140,7 @@ pub enum RateLimitResult {
 /// # Example
 ///
 /// ```rust,ignore
-/// use rustyx::middleware::rate_limit::{rate_limiter, RateLimiterConfig};
+/// use nitrox::middleware::rate_limit::{rate_limiter, RateLimiterConfig};
 ///
 /// let config = RateLimiterConfig::new(100, 60); // 100 requests per minute
 /// app.use_middleware(rate_limiter(config));

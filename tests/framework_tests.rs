@@ -1,5 +1,5 @@
-use rustyx::prelude::*;
-use rustyx::upload::parse_multipart;
+use nitrox::prelude::*;
+use nitrox::upload::parse_multipart;
 
 #[tokio::test]
 async fn test_param_matching_direct() {
@@ -20,11 +20,15 @@ async fn test_param_matching_direct() {
 #[tokio::test]
 async fn test_multipart_binary_safe() {
     let boundary = "---------------------------974767299852498929531610575";
-    let binary_bytes: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0xFF, 0xFE];
+    let binary_bytes: Vec<u8> = vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0xFF, 0xFE,
+    ];
 
     let mut body = Vec::new();
     body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-    body.extend_from_slice(b"Content-Disposition: form-data; name=\"file\"; filename=\"test.png\"\r\n");
+    body.extend_from_slice(
+        b"Content-Disposition: form-data; name=\"file\"; filename=\"test.png\"\r\n",
+    );
     body.extend_from_slice(b"Content-Type: image/png\r\n\r\n");
     body.extend_from_slice(&binary_bytes);
     body.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
@@ -61,7 +65,7 @@ async fn test_upload_filename_traversal_sanitized() {
 
 #[test]
 fn test_query_builder_sql_injection_escape() {
-    use rustyx::db::query::QueryBuilder;
+    use nitrox::db::query::QueryBuilder;
 
     let malicious_input = "admin' OR '1'='1";
     let query = QueryBuilder::table("users")

@@ -1,13 +1,13 @@
-# 🚀 RustyX
+# Nitrox
 
 <div align="center">
 
-![RustyX Logo](https://img.shields.io/badge/RustyX-Fast%20Web%20Framework-orange?style=for-the-badge&logo=rust)
+![Nitrox Logo](https://img.shields.io/badge/Nitrox-Fast%20Web%20Framework-orange?style=for-the-badge&logo=rust)
 
-[![Crates.io](https://img.shields.io/crates/v/rustyx.svg?style=flat-square)](https://crates.io/crates/rustyx)
-[![Documentation](https://docs.rs/rustyx/badge.svg)](https://docs.rs/rustyx)
+[![Crates.io](https://img.shields.io/crates/v/nitrox.svg?style=flat-square)](https://crates.io/crates/nitrox)
+[![Documentation](https://docs.rs/nitrox/badge.svg)](https://docs.rs/nitrox)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Mohammad007/rustyx/ci.yml?branch=main&style=flat-square)](https://github.com/Mohammad007/rustyx/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/KTBsomen/nitrox/ci.yml?branch=main&style=flat-square)](https://github.com/KTBsomen/nitrox/actions)
 [![Rust Version](https://img.shields.io/badge/rust-1.70%2B-blue.svg?style=flat-square)](https://www.rust-lang.org)
 
 **A fast, minimalist web framework for Rust inspired by ExpressJS**
@@ -48,25 +48,25 @@
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| 🎯 **ExpressJS-like API** | Familiar interface for JavaScript/Node.js developers |
-| ⚡ **Blazingly Fast** | Built on Hyper and Tokio for maximum performance |
-| 🔌 **Middleware Support** | Logger, CORS, Rate Limiting, Helmet, Timeout |
-| 🗄️ **Multi-Database ORM** | MongoDB, MySQL, PostgreSQL, SQLite support |
-| 🌐 **WebSocket Support** | Real-time bidirectional communication |
-| 📁 **Static Files** | Serve static assets with MIME type detection |
-| 📤 **File Upload** | Multer-like file upload with validation |
-| 🔒 **Type-Safe** | Leverage Rust's type system for safer code |
-| 📝 **JSON-First** | Designed for building REST APIs |
-| 🛡️ **Security** | Built-in Helmet middleware for security headers |
-| ⏱️ **Rate Limiting** | Protect APIs from abuse |
+| **ExpressJS-like API** | Familiar interface for JavaScript/Node.js developers |
+| **Blazingly Fast** | Built on Hyper and Tokio for maximum performance |
+| **Middleware Support** | Logger, CORS, Rate Limiting, Helmet, Timeout |
+| **Multi-Database ORM** | MongoDB, MySQL, PostgreSQL, SQLite support |
+| **WebSocket Support** | Real-time bidirectional communication |
+| **Static Files** | Serve static assets with MIME type detection |
+| **File Upload** | Multer-like file upload with validation |
+| **Type-Safe** | Leverage Rust's type system for safer code |
+| **JSON-First** | Designed for building REST APIs |
+| **Security** | Built-in Helmet middleware for security headers |
+| **Rate Limiting** | Protect APIs from abuse |
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 
@@ -77,7 +77,7 @@
 
 ```toml
 [dependencies]
-rustyx = "0.1.0"
+nitrox = "0.0.1"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -88,19 +88,19 @@ serde_json = "1.0"
 ```toml
 [dependencies]
 # SQLite (default)
-rustyx = "0.1.0"
+nitrox = "0.0.1"
 
 # MySQL
-rustyx = { version = "0.1.0", features = ["mysql"] }
+nitrox = { version = "0.0.1", features = ["mysql"] }
 
 # PostgreSQL
-rustyx = { version = "0.1.0", features = ["postgres"] }
+nitrox = { version = "0.0.1", features = ["postgres"] }
 
 # MongoDB
-rustyx = { version = "0.1.0", features = ["mongodb"] }
+nitrox = { version = "0.0.1", features = ["mongodb"] }
 
 # All databases
-rustyx = { version = "0.1.0", features = ["full"] }
+nitrox = { version = "0.0.1", features = ["full"] }
 ```
 
 ### Feature Flags
@@ -136,7 +136,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rustyx = "0.1.0"
+nitrox = "0.0.1"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -147,7 +147,7 @@ serde_json = "1.0"
 Edit `src/main.rs`:
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -155,13 +155,13 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
 
     // Create application
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     // Define routes
     app.get("/", |_req, res| async move {
         res.json(json!({
-            "message": "Welcome to RustyX!",
-            "version": rustyx::VERSION
+            "message": "Welcome to Nitrox!",
+            "version": nitrox::VERSION
         }))
     });
 
@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
     });
 
     // Start server
-    info!("🚀 Server starting...");
+    info!(" Server starting...");
     app.listen(3000).await
 }
 ```
@@ -186,16 +186,16 @@ Visit `http://localhost:3000` in your browser!
 
 ---
 
-## 📚 Core Concepts
+## Core Concepts
 
 ### Application
 
-The `RustyX` struct is the main entry point:
+The `Nitrox` struct is the main entry point:
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
-let app = RustyX::new();
+let app = Nitrox::new();
 
 // Configure routes
 app.get("/path", handler);
@@ -214,7 +214,7 @@ app.listen(3000).await?;
 
 ### Routing
 
-RustyX supports ExpressJS-style routing with path parameters:
+Nitrox supports ExpressJS-style routing with path parameters:
 
 ```rust
 // Basic routes
@@ -331,9 +331,9 @@ The `Response` object provides methods for sending responses:
 Middleware functions process requests before they reach route handlers:
 
 ```rust
-use rustyx::middleware::*;
+use nitrox::middleware::*;
 
-let app = RustyX::new();
+let app = Nitrox::new();
 
 // Built-in middleware
 app.use_middleware(logger());           // Request logging
@@ -358,14 +358,14 @@ app.use_middleware(|req, res, next| async move {
 
 ---
 
-## 🔥 Advanced Features
+## Advanced Features
 
 ### File Upload
 
 Handle single and multiple file uploads (similar to Express Multer):
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 let uploader = Uploader::new(
     UploadConfig::new()
@@ -415,14 +415,14 @@ UploadConfig::new()
     .use_uuid()                      // UUID filename (default)
 ```
 
-📖 **Full documentation:** [docs/UPLOAD.md](docs/UPLOAD.md)
+**Full documentation:** [docs/UPLOAD.md](docs/UPLOAD.md)
 
 ### Rate Limiting
 
 Protect your API from abuse:
 
 ```rust
-use rustyx::middleware::{rate_limiter, RateLimiterConfig};
+use nitrox::middleware::{rate_limiter, RateLimiterConfig};
 
 // Basic: 100 requests per 60 seconds
 app.use_middleware(simple_rate_limit(100, 60));
@@ -440,7 +440,7 @@ app.use_middleware(rate_limiter(config));
 Real-time communication:
 
 ```rust
-use rustyx::websocket::{WsServer, WsMessage};
+use nitrox::websocket::{WsServer, WsMessage};
 
 let ws_server = WsServer::new();
 
@@ -460,7 +460,7 @@ ws_server.broadcast_to_room("chat", WsMessage::Text("Chat message".into())).awai
 Serve static files:
 
 ```rust
-use rustyx::static_files::{static_handler, StaticConfig};
+use nitrox::static_files::{static_handler, StaticConfig};
 
 // Basic usage
 let config = StaticConfig::new("./public");
@@ -478,7 +478,7 @@ let config = StaticConfig::new("./public")
 Connect and query databases:
 
 ```rust
-use rustyx::db::prelude::*;
+use nitrox::db::prelude::*;
 
 // Configure SQLite
 let config = DatabaseConfig::new(DbDriver::SQLite, "app.db");
@@ -504,7 +504,7 @@ let query = QueryBuilder::table("users")
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
 ### Production Build
 
@@ -588,7 +588,7 @@ Create `/etc/systemd/system/my-api.service`:
 
 ```ini
 [Unit]
-Description=My RustyX API
+Description=My Nitrox API
 After=network.target
 
 [Service]
@@ -657,13 +657,13 @@ flyctl deploy
 
 ---
 
-## 📖 API Reference
+## API Reference
 
-### RustyX (Application)
+### Nitrox (Application)
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `new()` | `RustyX::new()` | Create new app |
+| `new()` | `Nitrox::new()` | Create new app |
 | `get()` | `.get(path, handler)` | GET route |
 | `post()` | `.post(path, handler)` | POST route |
 | `put()` | `.put(path, handler)` | PUT route |
@@ -701,12 +701,12 @@ flyctl deploy
 
 ---
 
-## 📝 Examples
+## Examples
 
 ### REST API with CRUD
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct User {
@@ -717,7 +717,7 @@ struct User {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app = RustyX::new();
+    let app = Nitrox::new();
     
     app.use_middleware(logger());
     app.use_middleware(cors("*"));
@@ -773,7 +773,7 @@ app.use_middleware(|req, res, next| async move {
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
@@ -793,12 +793,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ by the RustyX Team**
+**Made with ❤️ by the Somen & Team at [GetLostLeads.com](https://getlostleads.com)**
 
-⭐ Star us on [GitHub](https://github.com/Mohammad007/rustyx)!
+⭐ Star us on [GitHub](https://github.com/KTBsomen/nitrox)!
 
-[Report Bug](https://github.com/Mohammad007/rustyx/issues) •
-[Request Feature](https://github.com/Mohammad007/rustyx/issues) •
-[Documentation](https://docs.rs/rustyx)
+[Report Bug](https://github.com/KTBsomen/nitrox/issues) •
+[Request Feature](https://github.com/KTBsomen/nitrox/issues) •
+[Documentation](https://docs.rs/nitrox)
 
 </div>

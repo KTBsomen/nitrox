@@ -2,7 +2,7 @@
 
 use crate::controllers::HealthController;
 use crate::services::AppState;
-use rustyx::Router;
+use nitrox::Router;
 use std::sync::Arc;
 
 pub fn router(state: Arc<AppState>) -> Router {

@@ -141,7 +141,7 @@ pub fn get_mime_type(path: &Path) -> String {
 /// # Example
 ///
 /// ```rust,ignore
-/// use rustyx::static_files::{static_handler, StaticConfig};
+/// use nitrox::static_files::{static_handler, StaticConfig};
 ///
 /// let config = StaticConfig::new("./public");
 /// app.get("/static/*", static_handler(config));

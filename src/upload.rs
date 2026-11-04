@@ -13,7 +13,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use rustyx::upload::{Uploader, UploadConfig, StorageType};
+//! use nitrox::upload::{Uploader, UploadConfig, StorageType};
 //!
 //! let uploader = Uploader::new(
 //!     UploadConfig::new()

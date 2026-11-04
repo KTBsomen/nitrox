@@ -3,7 +3,7 @@
 use crate::models::{CreateUserDto, UpdateUserDto};
 use crate::services::AppState;
 use crate::utils::{ok, paginated};
-use rustyx::{Request, Response};
+use nitrox::{Request, Response};
 use std::sync::Arc;
 
 #[derive(Clone)]

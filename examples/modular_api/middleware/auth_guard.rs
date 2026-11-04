@@ -1,8 +1,8 @@
 //! Bearer Authentication Guard Middleware
 
 use crate::services::AppState;
-use rustyx::middleware::Next;
-use rustyx::{Request, Response};
+use nitrox::middleware::Next;
+use nitrox::{Request, Response};
 use serde_json::json;
 use std::sync::Arc;
 

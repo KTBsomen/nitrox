@@ -1,8 +1,8 @@
 //! Basic API Example
 //!
-//! This example demonstrates how to create a simple REST API using RustyX.
+//! This example demonstrates how to create a simple REST API using Nitrox.
 
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 // Define a User model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,13 +20,13 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
     // Create the application
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     // Root route
     app.get("/", |_req, res| async move {
         res.json(json!({
-            "message": "Welcome to RustyX!",
-            "version": rustyx::VERSION
+            "message": "Welcome to Nitrox!",
+            "version": nitrox::VERSION
         }))
     });
 
@@ -93,6 +93,6 @@ async fn main() -> Result<()> {
     });
 
     // Start the server
-    info!("🚀 Starting RustyX server...");
+    info!("🚀 Starting Nitrox server...");
     app.listen(3000).await
 }

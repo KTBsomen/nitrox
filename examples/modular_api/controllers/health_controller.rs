@@ -1,7 +1,7 @@
 //! Health and System Metrics Controller
 
 use crate::services::AppState;
-use rustyx::{Request, Response};
+use nitrox::{Request, Response};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
@@ -34,8 +34,8 @@ impl HealthController {
             "app_name": self.state.config.app_name,
             "environment": format!("{:?}", self.state.config.environment),
             "uptime_seconds": self.start_time.elapsed().as_secs(),
-            "framework": "RustyX",
-            "version": rustyx::VERSION
+            "framework": "Nitrox",
+            "version": nitrox::VERSION
         }))
     }
 }

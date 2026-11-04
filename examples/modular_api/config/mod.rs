@@ -39,7 +39,7 @@ impl AppConfig {
             .ok()
             .and_then(|p| p.parse().ok())
             .unwrap_or(3000);
-        let app_name = env::var("APP_NAME").unwrap_or_else(|_| "RustyX-Store-API".to_string());
+        let app_name = env::var("APP_NAME").unwrap_or_else(|_| "Nitrox-Store-API".to_string());
         let environment = Environment::from_str(&env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()));
         let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| "super-secret-production-key-change-me".to_string());
         let rate_limit_rpm = env::var("RATE_LIMIT_RPM")

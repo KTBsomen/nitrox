@@ -1,6 +1,6 @@
 //! Production Multi-File Modular REST API
 //!
-//! Demonstrates a full enterprise architecture built with RustyX:
+//! Demonstrates a full enterprise architecture built with Nitrox:
 //! - Config (Environment-driven configuration)
 //! - Models & DTOs (Serde serialization & validation)
 //! - Services (Thread-safe business logic & state)
@@ -17,7 +17,7 @@ mod services;
 mod utils;
 
 use config::AppConfig;
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 use services::AppState;
 use tracing::info;
 
@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     // 1. Initialize structured logging
     tracing_subscriber::fmt()
         .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "info,rustyx=info".to_string()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info,nitrox=info".to_string()),
         )
         .init();
 
@@ -37,8 +37,8 @@ async fn main() -> Result<()> {
     // 3. Initialize Shared Application State & Services
     let state = AppState::new(config.clone());
 
-    // 4. Initialize RustyX application
-    let app = RustyX::new();
+    // 4. Initialize Nitrox application
+    let app = Nitrox::new();
 
     // 5. Global Middlewares
     app.use_middleware(middleware::request_id_middleware);
@@ -46,8 +46,8 @@ async fn main() -> Result<()> {
     // 6. Root Route - API Index & Discovery
     app.get("/", |_req, res| async move {
         res.json(json!({
-            "service": "RustyX Enterprise REST API",
-            "version": rustyx::VERSION,
+            "service": "Nitrox Enterprise REST API",
+            "version": nitrox::VERSION,
             "status": "operational",
             "endpoints": {
                 "health": "/health",

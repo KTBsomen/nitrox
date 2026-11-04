@@ -1,6 +1,6 @@
 //! Standardized JSON API Response Format
 
-use rustyx::Response;
+use nitrox::Response;
 use serde::Serialize;
 use serde_json::json;
 

@@ -1,8 +1,8 @@
-//! # RustyX
+//! # Nitrox
 //!
 //! A fast, minimalist web framework for Rust inspired by ExpressJS.
 //!
-//! RustyX provides an ExpressJS-like interface for building web APIs in Rust,
+//! Nitrox provides an ExpressJS-like interface for building web APIs in Rust,
 //! with built-in ORM support for MongoDB, MySQL, SQLite, and PostgreSQL.
 //!
 //! ## Features
@@ -19,11 +19,11 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use rustyx::prelude::*;
+//! use nitrox::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     let app = RustyX::new();
+//!     let app = Nitrox::new();
 //!
 //!     app.get("/", |_req, res| async move {
 //!         res.json(json!({ "message": "Hello, World!" }))
@@ -35,14 +35,14 @@
 //!
 //! ## Routing
 //!
-//! RustyX supports all common HTTP methods with ExpressJS-style routing:
+//! Nitrox supports all common HTTP methods with ExpressJS-style routing:
 //!
 //! ```rust,no_run
-//! use rustyx::prelude::*;
+//! use nitrox::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     let app = RustyX::new();
+//!     let app = Nitrox::new();
 //!
 //!     // GET request
 //!     app.get("/users", |_req, res| async move {
@@ -71,11 +71,11 @@
 //! Add middleware for cross-cutting concerns:
 //!
 //! ```rust,no_run
-//! use rustyx::prelude::*;
+//! use nitrox::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     let app = RustyX::new();
+//!     let app = Nitrox::new();
 //!
 //!     // Built-in middleware
 //!     app.use_middleware(logger());          // Request logging
@@ -124,11 +124,11 @@
 //! Handle file uploads similar to Express Multer:
 //!
 //! ```rust,no_run
-//! use rustyx::prelude::*;
+//! use nitrox::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     let app = RustyX::new();
+//!     let app = Nitrox::new();
 //!
 //!     // Create uploader configuration
 //!     let uploader = Uploader::new(
@@ -219,7 +219,7 @@
 //! - [`websocket`] - WebSocket support
 //! - [`static_files`] - Static file serving
 
-#![doc(html_root_url = "https://docs.rs/rustyx/0.2.0")]
+#![doc(html_root_url = "https://docs.rs/nitrox/0.0.1")]
 #![allow(missing_docs)] // TODO: Add docs for all public items before 1.0
 #![warn(rustdoc::missing_crate_level_docs)]
 
@@ -239,7 +239,7 @@ pub mod utils;
 pub mod websocket;
 
 // Re-exports for convenience
-pub use app::RustyX;
+pub use app::{Nitrox, RustyX};
 pub use error::{Error, Result};
 pub use middleware::{Middleware, MiddlewareFn, Next};
 pub use request::Request;
@@ -254,18 +254,18 @@ pub use websocket::{WsMessage, WsRoom, WsServer};
 /// Import everything you need with a single line:
 ///
 /// ```rust
-/// use rustyx::prelude::*;
+/// use nitrox::prelude::*;
 /// ```
 ///
 /// This includes:
-/// - [`RustyX`] - Main application struct
+/// - [`Nitrox`] / [`RustyX`] - Main application struct
 /// - [`Request`] and [`Response`] - HTTP handling
 /// - [`Router`] - Route grouping
 /// - All middleware functions
 /// - Serde traits and macros
 /// - Tracing macros
 pub mod prelude {
-    pub use crate::app::RustyX;
+    pub use crate::app::{Nitrox, RustyX};
     pub use crate::controllers::Controller;
     pub use crate::db::prelude::*;
     pub use crate::error::{Error, Result};
@@ -290,20 +290,20 @@ pub mod prelude {
     pub use tracing::{debug, error, info, trace, warn};
 }
 
-/// Version of the RustyX library.
+/// Version of the Nitrox library.
 ///
 /// # Example
 ///
 /// ```rust
-/// println!("RustyX version: {}", rustyx::VERSION);
+/// println!("Nitrox version: {}", nitrox::VERSION);
 /// ```
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Name of the library.
-pub const NAME: &str = "RustyX";
+pub const NAME: &str = "Nitrox";
 
 /// GitHub repository URL.
-pub const REPOSITORY: &str = "https://github.com/Mohammad007/rustyx";
+pub const REPOSITORY: &str = "https://github.com/KTBsomen/nitrox";
 
 /// Documentation URL.
-pub const DOCS_URL: &str = "https://docs.rs/rustyx";
+pub const DOCS_URL: &str = "https://docs.rs/nitrox";

@@ -1,15 +1,15 @@
 # 🚀 Quick Start Guide
 
-Get up and running with RustyX in 5 minutes!
+Get up and running with Nitrox in 5 minutes!
 
 ## Hello World
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     app.get("/", |_req, res| async move {
         res.send("Hello, World!")
@@ -26,11 +26,11 @@ Run with `cargo run` and visit `http://localhost:3000`.
 ## JSON API
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     app.get("/api/status", |_req, res| async move {
         res.json(json!({
@@ -136,7 +136,7 @@ app.post("/users", |req, res| async move {
 ## CRUD Example
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -153,7 +153,7 @@ type Db = Arc<RwLock<HashMap<String, Todo>>>;
 #[tokio::main]
 async fn main() -> Result<()> {
     let db: Db = Arc::new(RwLock::new(HashMap::new()));
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     // List all todos
     let db_clone = db.clone();
@@ -241,12 +241,12 @@ async fn main() -> Result<()> {
 ## Adding Middleware
 
 ```rust
-use rustyx::prelude::*;
-use rustyx::middleware::*;
+use nitrox::prelude::*;
+use nitrox::middleware::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     // Logging
     app.use_middleware(logger());
@@ -311,7 +311,7 @@ app.get("/users/:id", |req, res| async move {
 ## Using Routers
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 fn user_routes() -> Router {
     let mut router = Router::new();
@@ -335,7 +335,7 @@ fn user_routes() -> Router {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     // Mount router at /api/users
     app.use_router("/api/users", user_routes());

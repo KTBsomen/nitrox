@@ -1,12 +1,12 @@
 # 📦 Installation Guide
 
-This guide will help you install and set up RustyX for your project.
+This guide will help you install and set up Nitrox for your project.
 
 ## Prerequisites
 
 ### Rust Installation
 
-RustyX requires **Rust 1.70** or higher. Install Rust using rustup:
+Nitrox requires **Rust 1.70** or higher. Install Rust using rustup:
 
 ```bash
 # Linux/macOS
@@ -39,8 +39,8 @@ For database features, you may need:
 ### Step 1: Create New Project
 
 ```bash
-cargo new my_rustyx_app
-cd my_rustyx_app
+cargo new my_nitrox_app
+cd my_nitrox_app
 ```
 
 ### Step 2: Add Dependencies
@@ -49,12 +49,12 @@ Edit `Cargo.toml`:
 
 ```toml
 [package]
-name = "my_rustyx_app"
+name = "my_nitrox_app"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rustyx = "0.1.0"
+nitrox = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -67,7 +67,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 Replace `src/main.rs`:
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -76,12 +76,12 @@ async fn main() -> Result<()> {
         .with_env_filter("info")
         .init();
 
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     app.get("/", |_req, res| async move {
         res.json(json!({
-            "message": "Hello from RustyX!",
-            "version": rustyx::VERSION
+            "message": "Hello from Nitrox!",
+            "version": nitrox::VERSION
         }))
     });
 
@@ -102,13 +102,13 @@ cargo run
 ### SQLite (Default)
 
 ```toml
-rustyx = "0.1.0"
+nitrox = "0.1.0"
 ```
 
 ### PostgreSQL
 
 ```toml
-rustyx = { version = "0.1.0", features = ["postgres"] }
+nitrox = { version = "0.1.0", features = ["postgres"] }
 ```
 
 On Ubuntu/Debian:
@@ -119,7 +119,7 @@ sudo apt install libpq-dev
 ### MySQL
 
 ```toml
-rustyx = { version = "0.1.0", features = ["mysql"] }
+nitrox = { version = "0.1.0", features = ["mysql"] }
 ```
 
 On Ubuntu/Debian:
@@ -130,13 +130,13 @@ sudo apt install libmysqlclient-dev
 ### MongoDB
 
 ```toml
-rustyx = { version = "0.1.0", features = ["mongodb"] }
+nitrox = { version = "0.1.0", features = ["mongodb"] }
 ```
 
 ### All Databases
 
 ```toml
-rustyx = { version = "0.1.0", features = ["full"] }
+nitrox = { version = "0.1.0", features = ["full"] }
 ```
 
 ---
@@ -147,7 +147,7 @@ rustyx = { version = "0.1.0", features = ["full"] }
 
 ```toml
 [dependencies]
-rustyx = "0.1.0"
+nitrox = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -155,7 +155,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-rustyx = { version = "0.1.0", features = ["postgres"] }
+nitrox = { version = "0.1.0", features = ["postgres"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -232,7 +232,7 @@ curl http://localhost:3000
 
 Expected output:
 ```json
-{"message":"Hello from RustyX!","version":"0.1.0"}
+{"message":"Hello from Nitrox!","version":"0.1.0"}
 ```
 
 ---

@@ -1,6 +1,6 @@
 //! File Upload Example
 //!
-//! This example demonstrates how to handle file uploads using RustyX.
+//! This example demonstrates how to handle file uploads using Nitrox.
 //!
 //! ## Testing with curl
 //!
@@ -17,14 +17,14 @@
 //!   -F "files=@/path/to/image2.jpg"
 //! ```
 
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    let app = RustyX::new();
+    let app = Nitrox::new();
 
     // Add middleware
     app.use_middleware(logger());
@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>RustyX File Upload</title>
+    <title>Nitrox File Upload</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
     </style>
 </head>
 <body>
-    <h1>🚀 RustyX File Upload</h1>
+    <h1>🚀 Nitrox File Upload</h1>
     
     <div class="upload-form">
         <h3>Single File Upload</h3>

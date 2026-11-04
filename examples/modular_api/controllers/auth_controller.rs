@@ -3,7 +3,7 @@
 use crate::models::{LoginDto, RegisterDto};
 use crate::services::AppState;
 use crate::utils::{created, ok};
-use rustyx::{Request, Response};
+use nitrox::{Request, Response};
 use std::sync::Arc;
 
 #[derive(Clone)]

@@ -1,6 +1,6 @@
 //! Standardized Application Error Types
 
-use rustyx::Response;
+use nitrox::Response;
 use serde_json::json;
 
 #[allow(dead_code)]

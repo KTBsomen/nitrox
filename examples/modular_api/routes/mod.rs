@@ -1,6 +1,6 @@
 //! Main Routing Module
 //!
-//! Mounts modular sub-routers onto the RustyX application instance.
+//! Mounts modular sub-routers onto the Nitrox application instance.
 
 pub mod auth_routes;
 pub mod health_routes;
@@ -8,10 +8,10 @@ pub mod product_routes;
 pub mod user_routes;
 
 use crate::services::AppState;
-use rustyx::RustyX;
+use nitrox::Nitrox;
 use std::sync::Arc;
 
-pub fn configure_routes(app: &RustyX, state: Arc<AppState>) {
+pub fn configure_routes(app: &Nitrox, state: Arc<AppState>) {
     // 1. Health & system monitoring endpoints
     app.use_router("", health_routes::router(state.clone()));
 

@@ -1,6 +1,6 @@
-# Contributing to RustyX
+# Contributing to Nitrox
 
-First off, thank you for considering contributing to RustyX! It's people like you that make RustyX such a great tool.
+First off, thank you for considering contributing to Nitrox! It's people like you that make Nitrox such a great tool.
 
 ## Table of Contents
 
@@ -38,12 +38,12 @@ This project and everyone participating in it is governed by our Code of Conduct
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/Mohammad007/rustyx.git
-   cd rustyx
+   git clone https://github.com/KTBsomen/nitrox.git
+   cd nitrox
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/Mohammad007/rustyx.git
+   git remote add upstream https://github.com/KTBsomen/nitrox.git
    ```
 
 ## How Can I Contribute?
@@ -88,8 +88,8 @@ Look for issues labeled `good first issue` - these are great for newcomers!
 
 ```bash
 # Clone the repo
-git clone https://github.com/Mohammad007/rustyx.git
-cd rustyx
+git clone https://github.com/KTBsomen/nitrox.git
+cd nitrox
 
 # Build the project
 cargo build
@@ -212,9 +212,9 @@ refactor(db): simplify connection pooling logic
 
 ### Getting Help
 
-- 📖 Read the [documentation](https://docs.rs/rustyx)
-- 💬 Join our [Discord server](https://discord.gg/rustyx)
-- 🐦 Follow us on [Twitter](https://twitter.com/rustyx)
+- 📖 Read the [documentation](https://docs.rs/nitrox)
+- 💬 Join our [Discord server](https://discord.gg/nitrox)
+- 🐦 Follow us on [Twitter](https://twitter.com/nitrox)
 - 📧 Email us at [bilalmalik1561@gmail.com](mailto:bilalmalik1561@gmail.com)
 
 ### Recognition
@@ -228,6 +228,6 @@ Contributors are recognized in:
 
 ## Thank You!
 
-Your contributions make RustyX better for everyone. Whether it's fixing a typo, adding a feature, or improving documentation - every contribution matters!
+Your contributions make Nitrox better for everyone. Whether it's fixing a typo, adding a feature, or improving documentation - every contribution matters!
 
 🚀 Happy coding!

@@ -1,6 +1,6 @@
 # 🚀 Deployment Guide
 
-This guide covers deploying your RustyX application to production.
+This guide covers deploying your Nitrox application to production.
 
 ## Table of Contents
 
@@ -245,11 +245,11 @@ docker-compose up -d --scale api=3
 
 ### Systemd Service
 
-Create `/etc/systemd/system/rustyx-api.service`:
+Create `/etc/systemd/system/nitrox-api.service`:
 
 ```ini
 [Unit]
-Description=RustyX API Server
+Description=Nitrox API Server
 After=network.target postgresql.service
 Wants=network-online.target
 
@@ -320,22 +320,22 @@ echo "✅ Deployment complete!"
 
 ```bash
 # Enable service
-sudo systemctl enable rustyx-api
+sudo systemctl enable nitrox-api
 
 # Start
-sudo systemctl start rustyx-api
+sudo systemctl start nitrox-api
 
 # Stop
-sudo systemctl stop rustyx-api
+sudo systemctl stop nitrox-api
 
 # Restart
-sudo systemctl restart rustyx-api
+sudo systemctl restart nitrox-api
 
 # View logs
-sudo journalctl -u rustyx-api -f
+sudo journalctl -u nitrox-api -f
 
 # Check status
-sudo systemctl status rustyx-api
+sudo systemctl status nitrox-api
 ```
 
 ---
@@ -413,7 +413,7 @@ cargo build --release
 ```nginx
 # /etc/nginx/sites-available/api.example.com
 
-upstream rustyx_backend {
+upstream nitrox_backend {
     server 127.0.0.1:3000;
     server 127.0.0.1:3001;  # If running multiple instances
     keepalive 32;
@@ -446,7 +446,7 @@ server {
     gzip_types application/json text/plain application/javascript;
 
     location / {
-        proxy_pass http://rustyx_backend;
+        proxy_pass http://nitrox_backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -461,7 +461,7 @@ server {
 
     # Health check endpoint
     location /health {
-        proxy_pass http://rustyx_backend/health;
+        proxy_pass http://nitrox_backend/health;
         access_log off;
     }
 }

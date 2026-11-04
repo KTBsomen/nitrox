@@ -84,7 +84,7 @@ impl Default for MiddlewareStack {
 /// # Example
 ///
 /// ```rust,ignore
-/// use rustyx::middleware::logger;
+/// use nitrox::middleware::logger;
 ///
 /// app.use_middleware(logger());
 /// ```
@@ -115,7 +115,7 @@ pub fn logger() -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output
 /// # Example
 ///
 /// ```rust,ignore
-/// use rustyx::middleware::cors;
+/// use nitrox::middleware::cors;
 ///
 /// // Allow all origins
 /// app.use_middleware(cors("*"));
@@ -299,7 +299,7 @@ impl Default for CompressionOptions {
 /// # Example
 ///
 /// ```rust,ignore
-/// use rustyx::middleware::helmet;
+/// use nitrox::middleware::helmet;
 ///
 /// app.use_middleware(helmet());
 /// ```
@@ -330,7 +330,7 @@ pub fn helmet() -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output
 /// # Example
 ///
 /// ```rust,ignore
-/// use rustyx::middleware::timeout;
+/// use nitrox::middleware::timeout;
 ///
 /// // 30 second timeout
 /// app.use_middleware(timeout(30000));

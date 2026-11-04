@@ -1,6 +1,6 @@
 # 🔌 Middleware Guide
 
-Middleware functions are the backbone of request processing in RustyX. They can modify requests, responses, and control the flow of request handling.
+Middleware functions are the backbone of request processing in Nitrox. They can modify requests, responses, and control the flow of request handling.
 
 ## How Middleware Works
 
@@ -24,7 +24,7 @@ Each middleware receives:
 Logs all incoming requests with method, path, status, and duration.
 
 ```rust
-use rustyx::middleware::logger;
+use nitrox::middleware::logger;
 
 app.use_middleware(logger());
 
@@ -36,7 +36,7 @@ app.use_middleware(logger());
 Adds Cross-Origin Resource Sharing headers.
 
 ```rust
-use rustyx::middleware::{cors, cors_with_options, CorsOptions};
+use nitrox::middleware::{cors, cors_with_options, CorsOptions};
 
 // Simple - allow all origins
 app.use_middleware(cors("*"));
@@ -56,7 +56,7 @@ app.use_middleware(cors_with_options(options));
 Adds security headers to protect against common vulnerabilities.
 
 ```rust
-use rustyx::middleware::helmet;
+use nitrox::middleware::helmet;
 
 app.use_middleware(helmet());
 
@@ -75,7 +75,7 @@ app.use_middleware(helmet());
 Protect your API from abuse.
 
 ```rust
-use rustyx::middleware::{rate_limiter, simple_rate_limit, RateLimiterConfig};
+use nitrox::middleware::{rate_limiter, simple_rate_limit, RateLimiterConfig};
 
 // Simple: 100 requests per 60 seconds
 app.use_middleware(simple_rate_limit(100, 60));
@@ -107,7 +107,7 @@ Headers added:
 Set a maximum time for request processing.
 
 ```rust
-use rustyx::middleware::timeout;
+use nitrox::middleware::timeout;
 
 // 30 second timeout
 app.use_middleware(timeout(30000));
@@ -122,7 +122,7 @@ app.use_middleware(timeout(30000));
 Adds a unique ID to each request.
 
 ```rust
-use rustyx::middleware::request_id;
+use nitrox::middleware::request_id;
 
 app.use_middleware(request_id());
 
@@ -134,7 +134,7 @@ app.use_middleware(request_id());
 Adds response processing time header.
 
 ```rust
-use rustyx::middleware::response_time;
+use nitrox::middleware::response_time;
 
 app.use_middleware(response_time());
 

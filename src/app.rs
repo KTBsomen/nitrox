@@ -1,16 +1,16 @@
 //! Main Application Module
 //!
-//! This module contains the core [`RustyX`] application struct and its implementation,
+//! This module contains the core [`Nitrox`] application struct and its implementation,
 //! providing an ExpressJS-like interface for building web APIs.
 //!
 //! # Example
 //!
 //! ```rust,no_run
-//! use rustyx::prelude::*;
+//! use nitrox::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     let app = RustyX::new();
+//!     let app = Nitrox::new();
 //!
 //!     app.get("/", |_req, res| async move {
 //!         res.json(json!({ "message": "Hello!" }))
@@ -134,17 +134,17 @@ impl ServerState {
 
 /// The main application struct, similar to Express's `app`.
 ///
-/// `RustyX` is the core of your web application. It handles routing,
+/// `Nitrox` is the core of your web application. It handles routing,
 /// middleware, and server lifecycle.
 ///
 /// # Example
 ///
 /// ```rust,no_run
-/// use rustyx::prelude::*;
+/// use nitrox::prelude::*;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
-///     let app = RustyX::new();
+///     let app = Nitrox::new();
 ///
 ///     // Add middleware
 ///     app.use_middleware(logger());
@@ -164,11 +164,14 @@ impl ServerState {
 ///     app.listen(3000).await
 /// }
 /// ```
-pub struct RustyX {
+pub struct Nitrox {
     router: Arc<std::sync::RwLock<Router>>,
     middleware_stack: Arc<std::sync::RwLock<MiddlewareStack>>,
     settings: Arc<std::sync::RwLock<AppSettings>>,
 }
+
+/// Backward compatibility alias for [`Nitrox`].
+pub type RustyX = Nitrox;
 
 /// Application settings configuration.
 ///
@@ -199,15 +202,15 @@ impl Default for AppSettings {
     }
 }
 
-impl RustyX {
-    /// Creates a new RustyX application instance.
+impl Nitrox {
+    /// Creates a new Nitrox application instance.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::RustyX;
+    /// use nitrox::Nitrox;
     ///
-    /// let app = RustyX::new();
+    /// let app = Nitrox::new();
     /// ```
     pub fn new() -> Self {
         Self {
@@ -322,7 +325,7 @@ impl RustyX {
     /// Start the HTTP server and listen on the specified port
     pub async fn listen(self, port: u16) -> Result<()> {
         self.listen_with_callback(port, || {
-            info!("🚀 RustyX server running at http://localhost:{}", port);
+            info!("🚀 Nitrox server running at http://localhost:{}", port);
         })
         .await
     }
@@ -369,13 +372,13 @@ impl RustyX {
     }
 }
 
-impl Default for RustyX {
+impl Default for Nitrox {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Clone for RustyX {
+impl Clone for Nitrox {
     fn clone(&self) -> Self {
         Self {
             router: Arc::clone(&self.router),

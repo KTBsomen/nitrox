@@ -1,6 +1,6 @@
 # 📁 File Upload Guide
 
-RustyX provides a powerful file upload module similar to Express's Multer.
+Nitrox provides a powerful file upload module similar to Express's Multer.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ RustyX provides a powerful file upload module similar to Express's Multer.
 ## Quick Start
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 // Create an uploader
 let uploader = Uploader::new(
@@ -338,11 +338,11 @@ match uploader.upload_single(...).await {
 ## Complete Example
 
 ```rust
-use rustyx::prelude::*;
+use nitrox::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app = RustyX::new();
+    let app = Nitrox::new();
     
     // Image uploader
     let image_uploader = Uploader::new(
@@ -407,7 +407,7 @@ curl -X POST http://localhost:3000/upload-multiple \
 ### Get MIME Type
 
 ```rust
-use rustyx::upload::get_mime_type;
+use nitrox::upload::get_mime_type;
 
 let mime = get_mime_type("png");  // "image/png"
 let mime = get_mime_type("pdf");  // "application/pdf"
@@ -416,7 +416,7 @@ let mime = get_mime_type("pdf");  // "application/pdf"
 ### Check File Type
 
 ```rust
-use rustyx::upload::{is_image, is_document, is_video, is_audio};
+use nitrox::upload::{is_image, is_document, is_video, is_audio};
 
 is_image("image/png");      // true
 is_document("application/pdf");  // true

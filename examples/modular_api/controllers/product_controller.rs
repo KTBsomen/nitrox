@@ -3,7 +3,7 @@
 use crate::models::{CreateProductDto, ProductFilterQuery, UpdateProductDto};
 use crate::services::AppState;
 use crate::utils::{created, ok, paginated};
-use rustyx::{Request, Response};
+use nitrox::{Request, Response};
 use std::sync::Arc;
 
 #[derive(Clone)]
