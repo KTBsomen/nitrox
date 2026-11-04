@@ -21,7 +21,7 @@
 //! ```
 
 use crate::error::Result;
-use crate::middleware::{MiddlewareStack, Next};
+use crate::middleware::{MiddlewareFn, MiddlewareStack, Next};
 use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
@@ -46,6 +46,91 @@ use tracing::{error, info};
 /// and [`Response`], and return a [`Future`] that resolves to a [`Response`].
 pub type HandlerFn =
     Arc<dyn Fn(Request, Response) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+
+/// Immutable server state used during serving to achieve lock-free routing and middleware dispatch.
+pub struct ServerState {
+    router: Router,
+    middlewares: Arc<Vec<MiddlewareFn>>,
+    #[allow(dead_code)]
+    settings: AppSettings,
+}
+
+impl ServerState {
+    /// Handle an incoming HTTP request without locking
+    pub async fn handle_request(
+        &self,
+        req: hyper::Request<Incoming>,
+        remote_addr: SocketAddr,
+    ) -> hyper::Response<Full<Bytes>> {
+        // Convert hyper request to our Request type
+        let request = match Request::from_hyper(req, remote_addr).await {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to parse request: {:?}", e);
+                return Response::new()
+                    .status(400)
+                    .json(serde_json::json!({ "error": e.to_string() }))
+                    .into_hyper();
+            }
+        };
+
+        let response = Response::new();
+
+        // Lock-free route lookup directly on immutable router
+        let handler_and_params = self
+            .router
+            .find_route(request.method(), request.path())
+            .map(|(h, p)| (Arc::clone(h), p));
+
+        if let Some((handler, params)) = handler_and_params {
+            let mut request = request;
+            request.set_params(params);
+
+            if self.middlewares.is_empty() {
+                // Zero-overhead fast path: invoke route handler directly
+                let response = handler(request, response).await;
+                response.into_hyper()
+            } else {
+                // Execute middleware pipeline
+                let mws = Arc::clone(&self.middlewares);
+                let response = Self::run_middleware_chain(mws, 0, request, response, handler).await;
+                response.into_hyper()
+            }
+        } else {
+            Response::new()
+                .status(404)
+                .json(serde_json::json!({ "error": "Not Found" }))
+                .into_hyper()
+        }
+    }
+
+    /// Recursively compose and execute middleware in registered order
+    fn run_middleware_chain(
+        middlewares: Arc<Vec<MiddlewareFn>>,
+        index: usize,
+        req: Request,
+        res: Response,
+        terminal_handler: HandlerFn,
+    ) -> Pin<Box<dyn Future<Output = Response> + Send>> {
+        if index < middlewares.len() {
+            let mw = Arc::clone(&middlewares[index]);
+            let next_mws = Arc::clone(&middlewares);
+            let next_handler = Arc::clone(&terminal_handler);
+            let next: Next = Arc::new(move |req, res| {
+                Self::run_middleware_chain(
+                    Arc::clone(&next_mws),
+                    index + 1,
+                    req,
+                    res,
+                    Arc::clone(&next_handler),
+                )
+            });
+            mw(req, res, next)
+        } else {
+            terminal_handler(req, res)
+        }
+    }
+}
 
 /// The main application struct, similar to Express's `app`.
 ///
@@ -158,7 +243,7 @@ impl RustyX {
         Fut: Future<Output = Response> + Send + 'static,
     {
         if let Ok(mut stack) = self.middleware_stack.write() {
-            stack.push(Box::new(move |req, res, next| {
+            stack.push(Arc::new(move |req, res, next| {
                 Box::pin(middleware(req, res, next))
             }));
         }
@@ -252,18 +337,26 @@ impl RustyX {
 
         callback();
 
-        let app = Arc::new(self);
+        // Freeze application state into an immutable ServerState (Zero runtime locks)
+        let server_state = Arc::new(ServerState {
+            router: self.router.read().unwrap().clone(),
+            middlewares: Arc::new(self.middleware_stack.read().unwrap().get_middlewares()),
+            settings: self.settings.read().unwrap().clone(),
+        });
 
         loop {
             let (stream, remote_addr) = listener.accept().await?;
+            // Disable Nagle's algorithm for sub-millisecond response delivery
+            let _ = stream.set_nodelay(true);
+
             let io = TokioIo::new(stream);
-            let app = Arc::clone(&app);
+            let state = Arc::clone(&server_state);
 
             tokio::spawn(async move {
                 let service = service_fn(move |req: hyper::Request<Incoming>| {
-                    let app = Arc::clone(&app);
+                    let state = Arc::clone(&state);
                     async move {
-                        let response = app.handle_request(req, remote_addr).await;
+                        let response = state.handle_request(req, remote_addr).await;
                         Ok::<_, Infallible>(response)
                     }
                 });
@@ -272,48 +365,6 @@ impl RustyX {
                     error!("Error serving connection: {:?}", err);
                 }
             });
-        }
-    }
-
-    /// Handle an incoming HTTP request
-    async fn handle_request(
-        &self,
-        req: hyper::Request<Incoming>,
-        remote_addr: SocketAddr,
-    ) -> hyper::Response<Full<Bytes>> {
-        // Convert hyper request to our Request type
-        let request = match Request::from_hyper(req, remote_addr).await {
-            Ok(r) => r,
-            Err(e) => {
-                error!("Failed to parse request: {:?}", e);
-                return Response::new()
-                    .status(400)
-                    .json(serde_json::json!({ "error": "Bad Request" }))
-                    .into_hyper();
-            }
-        };
-
-        let response = Response::new();
-
-        // Find and execute the route handler
-        let handler_and_params = {
-            let router = self.router.read().unwrap();
-            router
-                .find_route(request.method(), request.path())
-                .map(|(h, p)| (Arc::clone(h), p))
-        };
-
-        if let Some((handler, params)) = handler_and_params {
-            let mut request = request;
-            request.set_params(params);
-
-            let response = handler(request, response).await;
-            response.into_hyper()
-        } else {
-            Response::new()
-                .status(404)
-                .json(serde_json::json!({ "error": "Not Found" }))
-                .into_hyper()
         }
     }
 }

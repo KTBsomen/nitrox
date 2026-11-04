@@ -116,7 +116,10 @@ impl QueryBuilder {
             let conditions: Vec<String> = self
                 .where_clauses
                 .iter()
-                .map(|w| format!("{} = '{}'", w.field, w.value))
+                .map(|w| {
+                    let escaped_val = w.value.replace('\'', "''");
+                    format!("{} = '{}'", w.field, escaped_val)
+                })
                 .collect();
             sql.push_str(&format!(" WHERE {}", conditions.join(" AND ")));
         }

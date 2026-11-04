@@ -21,7 +21,7 @@ pub type Next =
     Arc<dyn Fn(Request, Response) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
 /// Middleware function type
-pub type MiddlewareFn = Box<
+pub type MiddlewareFn = Arc<
     dyn Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync,
 >;
 
@@ -34,7 +34,7 @@ pub trait Middleware: Send + Sync {
 
 /// Stack of middleware functions
 pub struct MiddlewareStack {
-    stack: Vec<MiddlewareFn>,
+    pub(crate) stack: Vec<MiddlewareFn>,
 }
 
 impl MiddlewareStack {
@@ -46,6 +46,16 @@ impl MiddlewareStack {
     /// Push a middleware function onto the stack
     pub fn push(&mut self, middleware: MiddlewareFn) {
         self.stack.push(middleware);
+    }
+
+    /// Take all middlewares from the stack
+    pub fn take_middlewares(&mut self) -> Vec<MiddlewareFn> {
+        std::mem::take(&mut self.stack)
+    }
+
+    /// Get cloned list of middlewares
+    pub fn get_middlewares(&self) -> Vec<MiddlewareFn> {
+        self.stack.clone()
     }
 
     /// Get the number of middleware in the stack

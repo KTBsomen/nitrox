@@ -345,7 +345,13 @@ impl Uploader {
             .unwrap_or("");
 
         match &self.config.naming {
-            FileNaming::Original => original.to_string(),
+            FileNaming::Original => {
+                Path::new(original)
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("file")
+                    .to_string()
+            },
             FileNaming::Uuid => Uuid::new_v4().to_string(),
             FileNaming::UuidWithExtension => {
                 if extension.is_empty() {
@@ -421,7 +427,16 @@ impl Uploader {
                 .map_err(|e| UploadError::IoError(e.to_string()))?;
         }
 
-        let file_path = destination.join(filename);
+        let canonical_dest = destination
+            .canonicalize()
+            .unwrap_or_else(|_| destination.to_path_buf());
+        let file_path = canonical_dest.join(filename);
+
+        if !file_path.starts_with(&canonical_dest) {
+            return Err(UploadError::IoError(
+                "Path traversal detected in upload filename".to_string(),
+            ));
+        }
 
         // Write file
         let mut file = fs::File::create(&file_path)
@@ -550,50 +565,64 @@ pub struct MultipartField {
 /// consider using a dedicated multipart parsing library.
 pub fn parse_multipart(body: &[u8], boundary: &str) -> Result<Vec<MultipartField>, UploadError> {
     let mut fields = Vec::new();
-    let boundary_bytes = format!("--{}", boundary);
-    let end_boundary = format!("--{}--", boundary);
+    let boundary_bytes = format!("--{}", boundary).into_bytes();
+    let double_crlf = b"\r\n\r\n";
 
-    // Convert to string for easier parsing
-    // Note: This may fail for binary data in some edge cases
-    let body_str = String::from_utf8_lossy(body);
+    let mut offset = 0;
+    while offset < body.len() {
+        let part_start = match find_subsequence(&body[offset..], &boundary_bytes) {
+            Some(idx) => offset + idx + boundary_bytes.len(),
+            None => break,
+        };
 
-    for part in body_str.split(&boundary_bytes) {
-        let part = part.trim();
-        if part.is_empty() || part == "--" || part.starts_with(&end_boundary) {
+        let part_end = match find_subsequence(&body[part_start..], &boundary_bytes) {
+            Some(idx) => part_start + idx,
+            None => body.len(),
+        };
+
+        let part_data = &body[part_start..part_end];
+        offset = part_end;
+
+        let part_data = if part_data.starts_with(b"\r\n") {
+            &part_data[2..]
+        } else {
+            part_data
+        };
+
+        if part_data.starts_with(b"--") || part_data.is_empty() {
             continue;
         }
 
-        // Split headers and content
-        if let Some(header_end) = part.find("\r\n\r\n") {
-            let headers = &part[..header_end];
-            let content = &part[header_end + 4..];
+        if let Some(header_end) = find_subsequence(part_data, double_crlf) {
+            let header_bytes = &part_data[..header_end];
+            let mut content = &part_data[header_end + 4..];
 
-            // Remove trailing CRLF
-            let content = content.trim_end_matches("\r\n");
+            if content.ends_with(b"\r\n") {
+                content = &content[..content.len() - 2];
+            }
 
-            // Parse Content-Disposition header
+            let headers_str = String::from_utf8_lossy(header_bytes);
             let mut name = String::new();
             let mut filename = None;
             let mut content_type = None;
 
-            for line in headers.lines() {
-                if line.to_lowercase().starts_with("content-disposition:") {
-                    // Parse name
-                    if let Some(name_start) = line.find("name=\"") {
-                        let rest = &line[name_start + 6..];
+            for line in headers_str.lines() {
+                let trimmed = line.trim();
+                if trimmed.to_lowercase().starts_with("content-disposition:") {
+                    if let Some(name_start) = trimmed.find("name=\"") {
+                        let rest = &trimmed[name_start + 6..];
                         if let Some(name_end) = rest.find('"') {
                             name = rest[..name_end].to_string();
                         }
                     }
-                    // Parse filename
-                    if let Some(fname_start) = line.find("filename=\"") {
-                        let rest = &line[fname_start + 10..];
+                    if let Some(fname_start) = trimmed.find("filename=\"") {
+                        let rest = &trimmed[fname_start + 10..];
                         if let Some(fname_end) = rest.find('"') {
                             filename = Some(rest[..fname_end].to_string());
                         }
                     }
-                } else if line.to_lowercase().starts_with("content-type:") {
-                    content_type = Some(line[13..].trim().to_string());
+                } else if trimmed.to_lowercase().starts_with("content-type:") {
+                    content_type = Some(trimmed[13..].trim().to_string());
                 }
             }
 
@@ -602,7 +631,7 @@ pub fn parse_multipart(body: &[u8], boundary: &str) -> Result<Vec<MultipartField
                     name,
                     filename,
                     content_type,
-                    data: content.as_bytes().to_vec(),
+                    data: content.to_vec(),
                 });
             }
         }
@@ -611,7 +640,12 @@ pub fn parse_multipart(body: &[u8], boundary: &str) -> Result<Vec<MultipartField
     Ok(fields)
 }
 
-/// Get MIME type from file extension
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > haystack.len() {
+        return None;
+    }
+    haystack.windows(needle.len()).position(|window| window == needle)
+}
 pub fn get_mime_type(extension: &str) -> &'static str {
     match extension.to_lowercase().as_str() {
         // Images

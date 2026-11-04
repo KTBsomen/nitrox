@@ -26,14 +26,14 @@ pub struct Request {
 }
 
 impl Request {
-    /// Create a new Request from a hyper request
+    /// Create a new Request from a hyper request with size limit protection
     pub async fn from_hyper(
         req: hyper::Request<Incoming>,
         remote_addr: SocketAddr,
     ) -> Result<Self> {
         let (parts, body) = req.into_parts();
 
-        // Parse query string
+        // Parse query string only if present
         let query = parts
             .uri
             .query()
@@ -44,11 +44,13 @@ impl Request {
             })
             .unwrap_or_default();
 
-        // Collect body bytes
-        let body_bytes = body
+        // Collect body bytes with 10MB upper limit to prevent OOM DoS attacks
+        const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+        let limited = http_body_util::Limited::new(body, MAX_BODY_SIZE);
+        let body_bytes = limited
             .collect()
             .await
-            .map_err(|e| Error::Internal(e.to_string()))?
+            .map_err(|e| Error::BadRequest(format!("Failed to read request body (max 10MB): {}", e)))?
             .to_bytes();
 
         Ok(Self {

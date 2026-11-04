@@ -160,10 +160,29 @@ pub fn static_handler(
                 .trim_start_matches('/')
                 .trim_start_matches("static/");
             
-            let full_path = config.root.join(file_path);
-            
+            let canonical_root = match config.root.canonicalize() {
+                Ok(r) => r,
+                Err(_) => {
+                    return res.status(404).json(serde_json::json!({
+                        "error": "Not Found",
+                        "message": "Static root directory not found"
+                    }));
+                }
+            };
+
+            let target_path = config.root.join(file_path);
+            let canonical_target = match target_path.canonicalize() {
+                Ok(t) => t,
+                Err(_) => {
+                    return res.status(404).json(serde_json::json!({
+                        "error": "Not Found",
+                        "message": "File not found"
+                    }));
+                }
+            };
+
             // Security check - prevent path traversal
-            if !full_path.starts_with(&config.root) {
+            if !canonical_target.starts_with(&canonical_root) {
                 return res.status(403).json(serde_json::json!({
                     "error": "Forbidden",
                     "message": "Access denied"
@@ -171,15 +190,17 @@ pub fn static_handler(
             }
 
             // Check if path is a directory
-            if full_path.is_dir() {
-                let index_path = full_path.join(&config.index);
-                if index_path.exists() {
-                    if let Some((content, mime)) = serve_file(&index_path).await {
-                        return res
-                            .status(200)
-                            .header("Content-Type", &mime)
-                            .header("Cache-Control", &format!("max-age={}", config.max_age))
-                            .send_bytes(content);
+            if canonical_target.is_dir() {
+                let index_path = canonical_target.join(&config.index);
+                if let Ok(canonical_index) = index_path.canonicalize() {
+                    if canonical_index.starts_with(&canonical_root) {
+                        if let Some((content, mime)) = serve_file(&canonical_index).await {
+                            return res
+                                .status(200)
+                                .header("Content-Type", &mime)
+                                .header("Cache-Control", &format!("max-age={}", config.max_age))
+                                .send_bytes(content);
+                        }
                     }
                 }
                 
@@ -190,7 +211,7 @@ pub fn static_handler(
             }
 
             // Serve the file
-            if let Some((content, mime)) = serve_file(&full_path).await {
+            if let Some((content, mime)) = serve_file(&canonical_target).await {
                 res.status(200)
                     .header("Content-Type", &mime)
                     .header("Cache-Control", &format!("max-age={}", config.max_age))

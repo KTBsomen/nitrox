@@ -29,7 +29,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new().status(201);
     /// ```
@@ -43,7 +43,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new()
     ///     .header("X-Custom-Header", "value");
@@ -67,7 +67,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new().send("Hello, World!");
     /// ```
@@ -85,7 +85,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new()
     ///     .header("Content-Type", "image/png")
@@ -101,7 +101,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     /// use serde_json::json;
     ///
     /// let res = Response::new().json(json!({ "message": "Hello" }));
@@ -126,7 +126,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new().html("<h1>Hello, World!</h1>");
     /// ```
@@ -140,7 +140,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new().redirect("/login");
     /// ```
@@ -200,7 +200,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new()
     ///     .cors("*")
@@ -223,7 +223,7 @@ impl Response {
     /// # Example
     ///
     /// ```rust
-    /// use rustyx::Response;
+    /// use rustyx::{Response, response::CookieOptions};
     ///
     /// let res = Response::new()
     ///     .cookie("session", "abc123", CookieOptions::default());

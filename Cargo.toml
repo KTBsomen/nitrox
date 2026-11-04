@@ -67,6 +67,10 @@ path = "examples/basic_api/main.rs"
 name = "file_upload"
 path = "examples/file_upload/main.rs"
 
+[[test]]
+name = "framework_tests"
+path = "tests/framework_tests.rs"
+
 [dependencies.anyhow]
 version = "1.0"
 

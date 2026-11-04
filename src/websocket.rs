@@ -127,28 +127,35 @@ impl WsServer {
 
     /// Broadcast message to all connections
     pub async fn broadcast(&self, message: WsMessage) {
-        let connections = self.connections.read();
-        for sender in connections.values() {
+        let senders: Vec<_> = {
+            let connections = self.connections.read();
+            connections.values().cloned().collect()
+        };
+        for sender in senders {
             let _ = sender.send(message.clone()).await;
         }
     }
 
     /// Broadcast to a specific room
     pub async fn broadcast_to_room(&self, room_name: &str, message: WsMessage) {
-        let rooms = self.rooms.read();
-        if let Some(room) = rooms.get(room_name) {
-            let members = room.members();
-            let connections = self.connections.read();
-
-            for member_id in members {
-                if let Some(sender) = connections.get(&member_id) {
-                    let _ = sender.send(message.clone()).await;
-                }
+        let senders: Vec<_> = {
+            let rooms = self.rooms.read();
+            if let Some(room) = rooms.get(room_name) {
+                let members = room.members();
+                let connections = self.connections.read();
+                members
+                    .into_iter()
+                    .filter_map(|member_id| connections.get(&member_id).cloned())
+                    .collect()
+            } else {
+                Vec::new()
             }
+        };
+
+        for sender in senders {
+            let _ = sender.send(message.clone()).await;
         }
     }
-
-    /// Create or get a room
     pub fn room(&self, name: &str) -> WsRoom {
         let mut rooms = self.rooms.write();
         rooms

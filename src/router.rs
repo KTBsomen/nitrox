@@ -13,14 +13,17 @@ use std::future::Future;
 use std::sync::Arc;
 
 /// Route handler with its matched parameters
+#[derive(Clone)]
 pub struct RouteHandler {
     handler: HandlerFn,
 }
 
 /// Express-like Router for grouping routes
+#[derive(Clone)]
 pub struct Router {
     routes: HashMap<Method, MatchitRouter<RouteHandler>>,
     prefix: String,
+    entries: Vec<(Method, String, HandlerFn)>,
 }
 
 impl Router {
@@ -29,6 +32,7 @@ impl Router {
         Self {
             routes: HashMap::new(),
             prefix: String::new(),
+            entries: Vec::new(),
         }
     }
 
@@ -37,20 +41,20 @@ impl Router {
         Self {
             routes: HashMap::new(),
             prefix: prefix.to_string(),
+            entries: Vec::new(),
         }
     }
 
     /// Add a route to the router
     pub fn add_route(&mut self, method: Method, path: &str, handler: HandlerFn) {
         let full_path = format!("{}{}", self.prefix, path);
-        let router = self.routes.entry(method).or_insert_with(MatchitRouter::new);
+        let router = self.routes.entry(method.clone()).or_insert_with(MatchitRouter::new);
 
-        // Convert Express-style params (:id) to matchit style ({id})
-        let converted_path = convert_express_params(&full_path);
-
-        if let Err(e) = router.insert(&converted_path, RouteHandler { handler }) {
-            tracing::warn!("Failed to insert route {}: {:?}", converted_path, e);
+        if let Err(e) = router.insert(&full_path, RouteHandler { handler: Arc::clone(&handler) }) {
+            tracing::warn!("Failed to insert route {}: {:?}", full_path, e);
         }
+
+        self.entries.push((method, full_path, handler));
     }
 
     /// Find a route handler for the given method and path
@@ -61,11 +65,10 @@ impl Router {
     ) -> Option<(&HandlerFn, HashMap<String, String>)> {
         if let Some(router) = self.routes.get(method) {
             if let Ok(matched) = router.at(path) {
-                let params: HashMap<String, String> = matched
-                    .params
-                    .iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect();
+                let mut params = HashMap::with_capacity(matched.params.len());
+                for (k, v) in matched.params.iter() {
+                    params.insert(k.to_string(), v.to_string());
+                }
                 return Some((&matched.value.handler, params));
             }
         }
@@ -73,9 +76,10 @@ impl Router {
     }
 
     /// Mount another router at a path prefix
-    pub fn mount(&mut self, _prefix: &str, mut other: Router) {
-        for (method, other_router) in other.routes.drain() {
-            self.routes.entry(method).or_insert(other_router);
+    pub fn mount(&mut self, prefix: &str, other: Router) {
+        let clean_prefix = prefix.trim_end_matches('/');
+        for (method, path, handler) in other.entries {
+            self.add_route(method, &format!("{}{}", clean_prefix, path), handler);
         }
     }
 
@@ -154,14 +158,9 @@ impl Router {
     where
         F: FnOnce(&mut Router),
     {
-        let mut group_router = Router::with_prefix(&format!("{}{}", self.prefix, prefix));
+        let mut group_router = Router::new();
         configure(&mut group_router);
-
-        // Merge group routes into main router
-        for (method, group_routes) in group_router.routes {
-            self.routes.entry(method).or_insert(group_routes);
-        }
-
+        self.mount(prefix, group_router);
         self
     }
 }
@@ -172,41 +171,36 @@ impl Default for Router {
     }
 }
 
-/// Convert Express-style route parameters to matchit format
-fn convert_express_params(path: &str) -> String {
-    let mut result = String::with_capacity(path.len());
-    let mut chars = path.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == ':' {
-            result.push('{');
-            while let Some(&next) = chars.peek() {
-                if next.is_alphanumeric() || next == '_' {
-                    result.push(chars.next().unwrap());
-                } else {
-                    break;
-                }
-            }
-            result.push('}');
-        } else {
-            result.push(c);
-        }
-    }
-
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_convert_express_params() {
-        assert_eq!(convert_express_params("/users/:id"), "/users/{id}");
-        assert_eq!(
-            convert_express_params("/users/:id/posts/:postId"),
-            "/users/{id}/posts/{postId}"
+    fn test_param_routing() {
+        let mut router = Router::new();
+        router.add_route(
+            Method::GET,
+            "/users/:id",
+            Arc::new(|_req, res| Box::pin(async move { res })),
         );
-        assert_eq!(convert_express_params("/static"), "/static");
+
+        let (handler, params) = router.find_route(&Method::GET, "/users/123").expect("Route should match");
+        assert_eq!(params.get("id"), Some(&"123".to_string()));
+        let _ = handler;
+    }
+
+    #[test]
+    fn test_group_routing() {
+        let mut router = Router::new();
+        router.group("/api", |api| {
+            api.add_route(
+                Method::GET,
+                "/users",
+                Arc::new(|_req, res| Box::pin(async move { res })),
+            );
+        });
+
+        let found = router.find_route(&Method::GET, "/api/users");
+        assert!(found.is_some());
     }
 }
