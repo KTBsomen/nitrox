@@ -62,17 +62,3 @@ async fn test_upload_filename_traversal_sanitized() {
     // Clean up
     let _ = tokio::fs::remove_dir_all("./test_uploads").await;
 }
-
-#[test]
-fn test_query_builder_sql_injection_escape() {
-    use nitrox::db::query::QueryBuilder;
-
-    let malicious_input = "admin' OR '1'='1";
-    let query = QueryBuilder::table("users")
-        .where_eq("username", malicious_input)
-        .build();
-
-    // Single quote should be escaped as ''
-    assert!(query.contains("username = 'admin'' OR ''1''=''1'"));
-    assert!(!query.contains("username = 'admin' OR '1'='1'"));
-}

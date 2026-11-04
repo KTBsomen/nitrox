@@ -2,19 +2,17 @@
 //!
 //! A fast, minimalist web framework for Rust inspired by ExpressJS.
 //!
-//! Nitrox provides an ExpressJS-like interface for building web APIs in Rust,
-//! with built-in ORM support for MongoDB, MySQL, SQLite, and PostgreSQL.
+//! Nitrox provides an ExpressJS-like interface for building high-performance web APIs in Rust.
 //!
 //! ## Features
 //!
-//! - 🎯 **ExpressJS-like API** - Familiar interface for JavaScript developers
+//! - 🎯 **ExpressJS-like API** - Familiar interface for JavaScript and TypeScript developers
 //! - ⚡ **Blazingly Fast** - Built on Hyper and Tokio for maximum performance
 //! - 🔌 **Middleware Support** - Logger, CORS, Rate Limiting, Helmet, Timeout
-//! - 📤 **File Upload** - Multer-like file upload with validation
-//! - 🗄️ **Multi-Database ORM** - MongoDB, MySQL, PostgreSQL, SQLite support
+//! - 📤 **File Upload** - Multer-like multipart file upload with validation
 //! - 🌐 **WebSocket Support** - Real-time bidirectional communication
-//! - 📁 **Static Files** - Serve static assets with MIME type detection
-//! - 🔒 **Type-Safe** - Leverage Rust's type system for safer code
+//! - 📁 **Static Files** - Serve static assets with automatic MIME type detection
+//! - 🔒 **Type-Safe** - Leverage Rust's type system for safer, robust code
 //!
 //! ## Quick Start
 //!
@@ -196,17 +194,6 @@
 //!
 //! **Archives:** ZIP, RAR, 7Z, TAR, GZ
 //!
-//! ## Feature Flags
-//!
-//! | Feature | Description |
-//! |---------|-------------|
-//! | `default` | SQLite support enabled |
-//! | `mysql` | MySQL database support |
-//! | `postgres` | PostgreSQL database support |
-//! | `sqlite` | SQLite database support |
-//! | `mongodb` | MongoDB database support |
-//! | `full` | All database drivers enabled |
-//!
 //! ## Modules
 //!
 //! - [`app`] - Main application struct
@@ -215,9 +202,14 @@
 //! - [`response`] - Response building
 //! - [`middleware`] - Middleware functions
 //! - [`upload`] - File upload handling
-//! - [`db`] - Database integration
 //! - [`websocket`] - WebSocket support
 //! - [`static_files`] - Static file serving
+//!
+//! # Database Support
+//!
+//! Nitrox is designed as a focused, lightweight base HTTP engine. Developers can easily use any database
+//! library of their choice (such as `sqlx`, `diesel`, `sea-orm`, or `mongodb`) by managing connections
+//! in their application state or service layers.
 
 #![doc(html_root_url = "https://docs.rs/nitrox/0.0.1")]
 #![allow(missing_docs)] // TODO: Add docs for all public items before 1.0
@@ -225,7 +217,6 @@
 
 pub mod app;
 pub mod controllers;
-pub mod db;
 pub mod error;
 pub mod middleware;
 pub mod models;
@@ -267,7 +258,6 @@ pub use websocket::{WsMessage, WsRoom, WsServer};
 pub mod prelude {
     pub use crate::app::{Nitrox, RustyX};
     pub use crate::controllers::Controller;
-    pub use crate::db::prelude::*;
     pub use crate::error::{Error, Result};
     pub use crate::middleware::{
         cors, cors_with_options, helmet, json, logger, rate_limiter, request_id, response_time,

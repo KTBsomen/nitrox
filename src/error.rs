@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-/// Custom error type for RustyX
+/// Custom error type for Nitrox
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("IO error: {0}")]
