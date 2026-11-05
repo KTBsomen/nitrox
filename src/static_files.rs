@@ -146,10 +146,10 @@ pub fn get_mime_type(path: &Path) -> String {
 /// let config = StaticConfig::new("./public");
 /// app.get("/static/*", static_handler(config));
 /// ```
-pub fn static_handler(
+pub fn static_handler<S: Send + Sync + 'static>(
     config: StaticConfig,
-) -> impl Fn(Request, Response) -> std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>> + Send + Sync + Clone + 'static {
-    move |req: Request, res: Response| {
+) -> impl Fn(Request<S>, Response) -> std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>> + Send + Sync + Clone + 'static {
+    move |req: Request<S>, res: Response| {
         let config = config.clone();
         
         Box::pin(async move {

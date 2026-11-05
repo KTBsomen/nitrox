@@ -3,55 +3,39 @@
 use crate::controllers::UserController;
 use crate::services::AppState;
 use nitrox::Router;
-use std::sync::Arc;
 
-pub fn router(state: Arc<AppState>) -> Router {
-    let mut r = Router::new();
-    let controller = UserController::new(state);
+pub fn router() -> Router<AppState> {
+    let mut r = Router::with_state();
 
     // List users (supports both / and without trailing slash)
-    let c = controller.clone();
-    r.get("", move |req, res| {
-        let c = c.clone();
-        async move { c.list_users(req, res).await }
+    r.get("", |req, res| async move {
+        UserController::list_users(req, res).await
     });
-    let c = controller.clone();
-    r.get("/", move |req, res| {
-        let c = c.clone();
-        async move { c.list_users(req, res).await }
+    r.get("/", |req, res| async move {
+        UserController::list_users(req, res).await
     });
 
     // Create user
-    let c = controller.clone();
-    r.post("", move |req, res| {
-        let c = c.clone();
-        async move { c.create_user(req, res).await }
+    r.post("", |req, res| async move {
+        UserController::create_user(req, res).await
     });
-    let c = controller.clone();
-    r.post("/", move |req, res| {
-        let c = c.clone();
-        async move { c.create_user(req, res).await }
+    r.post("/", |req, res| async move {
+        UserController::create_user(req, res).await
     });
 
     // Get user by ID
-    let c = controller.clone();
-    r.get("/:id", move |req, res| {
-        let c = c.clone();
-        async move { c.get_user(req, res).await }
+    r.get("/:id", |req, res| async move {
+        UserController::get_user(req, res).await
     });
 
     // Update user by ID
-    let c = controller.clone();
-    r.put("/:id", move |req, res| {
-        let c = c.clone();
-        async move { c.update_user(req, res).await }
+    r.put("/:id", |req, res| async move {
+        UserController::update_user(req, res).await
     });
 
     // Delete user by ID
-    let c = controller.clone();
-    r.delete("/:id", move |req, res| {
-        let c = c.clone();
-        async move { c.delete_user(req, res).await }
+    r.delete("/:id", |req, res| async move {
+        UserController::delete_user(req, res).await
     });
 
     r

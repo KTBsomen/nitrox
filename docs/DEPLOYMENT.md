@@ -1,4 +1,4 @@
-# 🚀 Deployment Guide
+# Deployment Guide
 
 This guide covers deploying your Nitrox application to production.
 
@@ -294,7 +294,7 @@ APP_NAME="my-api"
 DEPLOY_DIR="/opt/$APP_NAME"
 BINARY_NAME="my_app"
 
-echo "🚀 Deploying $APP_NAME..."
+echo " Deploying $APP_NAME..."
 
 # Build
 cargo build --release
@@ -313,7 +313,7 @@ sudo chmod 755 $DEPLOY_DIR/$BINARY_NAME
 sudo systemctl start $APP_NAME
 sudo systemctl status $APP_NAME
 
-echo "✅ Deployment complete!"
+echo " Deployment complete!"
 ```
 
 ### Commands

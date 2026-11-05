@@ -75,12 +75,12 @@ Look for issues labeled `good first issue` - these are great for newcomers!
 
 #### Types of Contributions
 
-- 🐛 Bug fixes
-- ✨ New features
-- 📚 Documentation improvements
-- 🧪 Test coverage
-- 🎨 Code refactoring
-- ⚡ Performance improvements
+-  Bug fixes
+-  New features
+-  Documentation improvements
+-  Test coverage
+-  Code refactoring
+-  Performance improvements
 
 ## Development Setup
 
@@ -193,13 +193,13 @@ refactor(db): simplify connection pooling logic
 
 ### Before Submitting
 
-1. ✅ Update your fork with the latest upstream changes
-2. ✅ Run `cargo fmt` to format your code
-3. ✅ Run `cargo clippy` and fix any warnings
-4. ✅ Run `cargo test` and ensure all tests pass
-5. ✅ Add tests for new functionality
-6. ✅ Update documentation if needed
-7. ✅ Update the CHANGELOG if applicable
+1.  Update your fork with the latest upstream changes
+2.  Run `cargo fmt` to format your code
+3.  Run `cargo clippy` and fix any warnings
+4.  Run `cargo test` and ensure all tests pass
+5.  Add tests for new functionality
+6.  Update documentation if needed
+7.  Update the CHANGELOG if applicable
 
 ### Submitting
 
@@ -212,10 +212,10 @@ refactor(db): simplify connection pooling logic
 
 ### Getting Help
 
-- 📖 Read the [documentation](https://docs.rs/nitrox)
-- 💬 Join our [Discord server](https://discord.gg/nitrox)
-- 🐦 Follow us on [Twitter](https://twitter.com/nitrox)
-- 📧 Email us at [bilalmalik1561@gmail.com](mailto:bilalmalik1561@gmail.com)
+-  Read the [documentation](https://docs.rs/nitrox)
+-  Join our [Discord server](https://discord.gg/nitrox)
+-  Follow us on [Twitter](https://twitter.com/nitrox)
+-  Email us at [bilalmalik1561@gmail.com](mailto:bilalmalik1561@gmail.com)
 
 ### Recognition
 
@@ -230,4 +230,4 @@ Contributors are recognized in:
 
 Your contributions make Nitrox better for everyone. Whether it's fixing a typo, adding a feature, or improving documentation - every contribution matters!
 
-🚀 Happy coding!
+ Happy coding!

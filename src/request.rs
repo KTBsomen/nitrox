@@ -11,10 +11,14 @@ use hyper::{header::HeaderValue, HeaderMap, Method, Uri, Version};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
-/// Request struct similar to Express's req object
+/// Request struct similar to Express's `req` object.
+///
+/// Generic over application state `S`. Defaults to `()` for stateless applications.
+/// Access shared state directly via `req.state` or `req.state()`.
 #[derive(Debug)]
-pub struct Request {
+pub struct Request<S = ()> {
     method: Method,
     uri: Uri,
     version: Version,
@@ -23,13 +27,30 @@ pub struct Request {
     params: HashMap<String, String>,
     query: HashMap<String, String>,
     remote_addr: SocketAddr,
+    /// Shared application state wrapped in an [`Arc`].
+    ///
+    /// Provides lock-free access to databases, connection pools, caches,
+    /// configuration, and background channels without requiring closure captures
+    /// or manual controller cloning.
+    pub state: Arc<S>,
 }
 
-impl Request {
-    /// Create a new Request from a hyper request with size limit protection
+impl Request<()> {
+    /// Create a new Request from a hyper request with size limit protection and default unit state
     pub async fn from_hyper(
         req: hyper::Request<Incoming>,
         remote_addr: SocketAddr,
+    ) -> Result<Self> {
+        Self::from_hyper_with_state(req, remote_addr, Arc::new(())).await
+    }
+}
+
+impl<S> Request<S> {
+    /// Create a new Request from a hyper request with application state attached
+    pub async fn from_hyper_with_state(
+        req: hyper::Request<Incoming>,
+        remote_addr: SocketAddr,
+        state: Arc<S>,
     ) -> Result<Self> {
         let (parts, body) = req.into_parts();
 
@@ -62,7 +83,32 @@ impl Request {
             params: HashMap::new(),
             query,
             remote_addr,
+            state,
         })
+    }
+
+    /// Access a reference to the shared application state.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use nitrox::prelude::*;
+    ///
+    /// struct DatabaseConfig {
+    ///     connection_string: String,
+    /// }
+    ///
+    /// let app = Nitrox::with_state(DatabaseConfig {
+    ///     connection_string: "postgres://localhost/db".into(),
+    /// });
+    ///
+    /// app.get("/status", |req, res| async move {
+    ///     let conn = &req.state.connection_string;
+    ///     res.json(json!({ "connected_to": conn }))
+    /// });
+    /// ```
+    pub fn state(&self) -> &S {
+        &self.state
     }
 
     /// Get the HTTP method

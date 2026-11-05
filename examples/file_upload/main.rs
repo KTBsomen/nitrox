@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
     </style>
 </head>
 <body>
-    <h1>🚀 Nitrox File Upload</h1>
+    <h1>Nitrox File Upload</h1>
     
     <div class="upload-form">
         <h3>Single File Upload</h3>
@@ -318,7 +318,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    info!("🚀 File Upload Server running at http://localhost:3000");
+    info!("File Upload Server running at http://localhost:3000");
     info!("   Open browser to test file uploads");
 
     app.listen(3000).await

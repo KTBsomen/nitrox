@@ -10,33 +10,33 @@ use async_trait::async_trait;
 
 /// Base Controller trait
 #[async_trait]
-pub trait Controller: Send + Sync {
+pub trait Controller<S: Send + Sync + 'static = ()>: Send + Sync {
     /// Handle index/list request
-    async fn index(&self, req: Request, res: Response) -> Response {
+    async fn index(&self, req: Request<S>, res: Response) -> Response {
         res.status(501)
             .json(serde_json::json!({ "error": "Not implemented" }))
     }
 
     /// Handle show/get one request
-    async fn show(&self, req: Request, res: Response) -> Response {
+    async fn show(&self, req: Request<S>, res: Response) -> Response {
         res.status(501)
             .json(serde_json::json!({ "error": "Not implemented" }))
     }
 
     /// Handle create request
-    async fn create(&self, req: Request, res: Response) -> Response {
+    async fn create(&self, req: Request<S>, res: Response) -> Response {
         res.status(501)
             .json(serde_json::json!({ "error": "Not implemented" }))
     }
 
     /// Handle update request
-    async fn update(&self, req: Request, res: Response) -> Response {
+    async fn update(&self, req: Request<S>, res: Response) -> Response {
         res.status(501)
             .json(serde_json::json!({ "error": "Not implemented" }))
     }
 
     /// Handle delete request
-    async fn destroy(&self, req: Request, res: Response) -> Response {
+    async fn destroy(&self, req: Request<S>, res: Response) -> Response {
         res.status(501)
             .json(serde_json::json!({ "error": "Not implemented" }))
     }
@@ -54,19 +54,19 @@ macro_rules! crud_controller {
                 res.json(serde_json::json!({ "data": [], "collection": $collection }))
             }
 
-            async fn show(&self, req: Request, res: Response) -> Response {
+            async fn show(&self, req: Request<S>, res: Response) -> Response {
                 let id = req.param("id").cloned().unwrap_or_default();
                 res.json(serde_json::json!({ "id": id, "collection": $collection }))
             }
 
-            async fn create(&self, req: Request, res: Response) -> Response {
+            async fn create(&self, req: Request<S>, res: Response) -> Response {
                 match req.json::<$model>() {
                     Ok(data) => res.status(201).json(data),
                     Err(e) => res.bad_request(&e.to_string()),
                 }
             }
 
-            async fn update(&self, req: Request, res: Response) -> Response {
+            async fn update(&self, req: Request<S>, res: Response) -> Response {
                 let id = req.param("id").cloned().unwrap_or_default();
                 match req.json::<$model>() {
                     Ok(data) => res.json(serde_json::json!({ "id": id, "data": data })),
@@ -74,7 +74,7 @@ macro_rules! crud_controller {
                 }
             }
 
-            async fn destroy(&self, req: Request, res: Response) -> Response {
+            async fn destroy(&self, req: Request<S>, res: Response) -> Response {
                 let id = req.param("id").cloned().unwrap_or_default();
                 res.json(serde_json::json!({ "deleted": true, "id": id }))
             }

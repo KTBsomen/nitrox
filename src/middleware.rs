@@ -17,44 +17,44 @@ use tracing::info;
 pub use rate_limit::{rate_limiter, simple_rate_limit, RateLimiter, RateLimiterConfig};
 
 /// Next function type for middleware chaining
-pub type Next =
-    Arc<dyn Fn(Request, Response) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+pub type Next<S = ()> =
+    Arc<dyn Fn(Request<S>, Response) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
 /// Middleware function type
-pub type MiddlewareFn = Arc<
-    dyn Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync,
+pub type MiddlewareFn<S = ()> = Arc<
+    dyn Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync,
 >;
 
 /// Trait for implementing middleware
 #[async_trait]
-pub trait Middleware: Send + Sync {
+pub trait Middleware<S: Send + Sync + 'static = ()>: Send + Sync {
     /// Process the request and optionally call the next middleware
-    async fn handle(&self, req: Request, res: Response, next: Next) -> Response;
+    async fn handle(&self, req: Request<S>, res: Response, next: Next<S>) -> Response;
 }
 
 /// Stack of middleware functions
-pub struct MiddlewareStack {
-    pub(crate) stack: Vec<MiddlewareFn>,
+pub struct MiddlewareStack<S = ()> {
+    pub(crate) stack: Vec<MiddlewareFn<S>>,
 }
 
-impl MiddlewareStack {
+impl<S: Send + Sync + 'static> MiddlewareStack<S> {
     /// Create a new empty middleware stack
     pub fn new() -> Self {
         Self { stack: Vec::new() }
     }
 
     /// Push a middleware function onto the stack
-    pub fn push(&mut self, middleware: MiddlewareFn) {
+    pub fn push(&mut self, middleware: MiddlewareFn<S>) {
         self.stack.push(middleware);
     }
 
     /// Take all middlewares from the stack
-    pub fn take_middlewares(&mut self) -> Vec<MiddlewareFn> {
+    pub fn take_middlewares(&mut self) -> Vec<MiddlewareFn<S>> {
         std::mem::take(&mut self.stack)
     }
 
     /// Get cloned list of middlewares
-    pub fn get_middlewares(&self) -> Vec<MiddlewareFn> {
+    pub fn get_middlewares(&self) -> Vec<MiddlewareFn<S>> {
         self.stack.clone()
     }
 
@@ -69,7 +69,7 @@ impl MiddlewareStack {
     }
 }
 
-impl Default for MiddlewareStack {
+impl<S: Send + Sync + 'static> Default for MiddlewareStack<S> {
     fn default() -> Self {
         Self::new()
     }
@@ -88,11 +88,11 @@ impl Default for MiddlewareStack {
 ///
 /// app.use_middleware(logger());
 /// ```
-pub fn logger() -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+pub fn logger<S: Send + Sync + 'static>() -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         Box::pin(async move {
             let method = req.method().clone();
             let path = req.path().to_string();
@@ -123,13 +123,13 @@ pub fn logger() -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output
 /// // Allow specific origin
 /// app.use_middleware(cors("https://example.com"));
 /// ```
-pub fn cors(
+pub fn cors<S: Send + Sync + 'static>(
     origin: &'static str,
-) -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+) -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         Box::pin(async move {
             // Handle preflight requests
             if req.method() == hyper::Method::OPTIONS {
@@ -201,13 +201,13 @@ impl CorsOptions {
 }
 
 /// Advanced CORS middleware with options
-pub fn cors_with_options(
+pub fn cors_with_options<S: Send + Sync + 'static>(
     options: CorsOptions,
-) -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+) -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         let opts = options.clone();
         Box::pin(async move {
             if req.method() == hyper::Method::OPTIONS {
@@ -253,13 +253,13 @@ impl Default for JsonOptions {
 }
 
 /// JSON body parser middleware
-pub fn json(
+pub fn json<S: Send + Sync + 'static>(
     options: JsonOptions,
-) -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+) -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         let _options = options.clone();
         Box::pin(async move {
             // Check content type
@@ -303,11 +303,11 @@ impl Default for CompressionOptions {
 ///
 /// app.use_middleware(helmet());
 /// ```
-pub fn helmet() -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+pub fn helmet<S: Send + Sync + 'static>() -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         Box::pin(async move {
             let response = next(req, res).await;
             response
@@ -335,13 +335,13 @@ pub fn helmet() -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output
 /// // 30 second timeout
 /// app.use_middleware(timeout(30000));
 /// ```
-pub fn timeout(
+pub fn timeout<S: Send + Sync + 'static>(
     duration_ms: u64,
-) -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+) -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         Box::pin(async move {
             let timeout = tokio::time::Duration::from_millis(duration_ms);
 
@@ -356,12 +356,12 @@ pub fn timeout(
 }
 
 /// Request ID middleware - adds unique ID to each request
-pub fn request_id(
-) -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+pub fn request_id<S: Send + Sync + 'static>(
+) -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         Box::pin(async move {
             let request_id = uuid::Uuid::new_v4().to_string();
             let response = next(req, res).await;
@@ -371,12 +371,12 @@ pub fn request_id(
 }
 
 /// Response time middleware - adds X-Response-Time header
-pub fn response_time(
-) -> impl Fn(Request, Response, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+pub fn response_time<S: Send + Sync + 'static>(
+) -> impl Fn(Request<S>, Response, Next<S>) -> Pin<Box<dyn Future<Output = Response> + Send>>
        + Send
        + Sync
        + Clone {
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         Box::pin(async move {
             let start = std::time::Instant::now();
             let response = next(req, res).await;

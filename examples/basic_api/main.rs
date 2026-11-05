@@ -93,6 +93,6 @@ async fn main() -> Result<()> {
     });
 
     // Start the server
-    info!("🚀 Starting Nitrox server...");
+    info!("Starting Nitrox server...");
     app.listen(3000).await
 }

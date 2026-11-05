@@ -6,13 +6,14 @@
 //!
 //! ## Features
 //!
-//! - 🎯 **ExpressJS-like API** - Familiar interface for JavaScript and TypeScript developers
-//! - ⚡ **Blazingly Fast** - Built on Hyper and Tokio for maximum performance
-//! - 🔌 **Middleware Support** - Logger, CORS, Rate Limiting, Helmet, Timeout
-//! - 📤 **File Upload** - Multer-like multipart file upload with validation
-//! - 🌐 **WebSocket Support** - Real-time bidirectional communication
-//! - 📁 **Static Files** - Serve static assets with automatic MIME type detection
-//! - 🔒 **Type-Safe** - Leverage Rust's type system for safer, robust code
+//! - **ExpressJS-like API** - Familiar interface for JavaScript and TypeScript developers
+//! - **High Performance** - Built on Hyper and Tokio for high-throughput, low-latency execution
+//! - **Zero-Clone State Management** - Type-safe shared application state via `req.state`
+//! - **Middleware Support** - Logger, CORS, Rate Limiting, Helmet, Timeout
+//! - **File Upload** - Multer-like multipart file upload with validation
+//! - **WebSocket Support** - Real-time bidirectional communication
+//! - **Static Files** - Serve static assets with automatic MIME type detection
+//! - **Type-Safe** - Leverage Rust's type system for safer, robust code
 //!
 //! ## Quick Start
 //!
@@ -63,6 +64,68 @@
 //!     app.listen(3000).await
 //! }
 //! ```
+//!
+//! ## Application State Management
+//!
+//! Nitrox supports global, type-safe shared state using [`Nitrox::with_state`].
+//! State is automatically wrapped in an [`Arc`] and injected into every [`Request`],
+//! accessible via `req.state` without manual closure cloning:
+//!
+//! ```rust,no_run
+//! use nitrox::prelude::*;
+//!
+//! struct AppState {
+//!     environment: String,
+//!     api_version: &'static str,
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<()> {
+//!     let state = AppState {
+//!         environment: "production".to_string(),
+//!         api_version: "v1",
+//!     };
+//!
+//!     let app = Nitrox::with_state(state);
+//!
+//!     app.get("/info", |req, res| async move {
+//!         res.json(json!({
+//!             "env": req.state.environment,
+//!             "version": req.state.api_version
+//!         }))
+//!     });
+//!
+//!     app.listen(3000).await
+//! }
+//! ```
+//!
+//! ### State Requirements and Limitations
+//!
+//! **Trait Bounds:**
+//! Any type passed into `Nitrox::with_state(state)` must implement `Send + Sync + 'static`:
+//! - `Send`: Safe to transfer across multi-threaded asynchronous tasks.
+//! - `Sync`: Safe for concurrent read references across multiple worker threads.
+//! - `'static`: Must own its data or hold static references (no short-lived temporary stack borrows).
+//!
+//! **What CAN Be Passed:**
+//! - Connection pools: `sqlx::PgPool`, `sqlx::MySqlPool`, `deadpool_redis::Pool`, `bb8::Pool`
+//! - HTTP clients: `reqwest::Client` singletons
+//! - Thread-safe synchronized structures: `dashmap::DashMap`, `parking_lot::RwLock<HashMap<K, V>>`, `moka::future::Cache`
+//! - Background channels: `tokio::sync::mpsc::Sender<T>`, `tokio::sync::broadcast::Sender<T>`
+//! - Atomic indicators: `std::sync::atomic::AtomicU64`, `AtomicBool`
+//! - Read-mostly configurations: `arc_swap::ArcSwap<Config>`, immutable data structs
+//!
+//! **What CANNOT Be Passed (and Anti-Patterns to Avoid):**
+//! - **Non-`Send` / Non-`Sync` types:** Single-threaded primitives like `Rc<T>`, `RefCell<T>`,
+//!   `std::cell::Cell<T>`, and raw pointers (`*const T`, `*mut T`) cannot cross thread boundaries.
+//!   Use `Arc<T>` and `parking_lot::RwLock<T>` or `tokio::sync::RwLock<T>` instead.
+//! - **Non-`'static` lifetimes:** Structs containing temporary borrows (`&'a str` or `&'a T`)
+//!   are rejected at compile time because the server lifecycle is indefinite. Store owned `String` or `Arc<T>`.
+//! - **`std::sync::Mutex` held across `.await`:** Standard library mutex guards are not `Send` and will
+//!   block the Tokio worker thread runtime. Use `tokio::sync::Mutex` if a lock must be held across
+//!   asynchronous `.await` operations, or `parking_lot::RwLock` for synchronous critical sections.
+//! - **Un-pooled single connections:** Raw single-threaded drivers (e.g. un-pooled `rusqlite::Connection`)
+//!   fail the `Sync` requirement. Always wrap single connections in a connection pool manager.
 //!
 //! ## Middleware
 //!
@@ -205,11 +268,11 @@
 //! - [`websocket`] - WebSocket support
 //! - [`static_files`] - Static file serving
 //!
-//! # Database Support
+//! ## Database Support
 //!
-//! Nitrox is designed as a focused, lightweight base HTTP engine. Developers can easily use any database
-//! library of their choice (such as `sqlx`, `diesel`, `sea-orm`, or `mongodb`) by managing connections
-//! in their application state or service layers.
+//! Nitrox is completely database agnostic. Manage connection pools (`sqlx`, `diesel`,
+//! `sea-orm`, `mongodb`, or `redis`) inside your custom application state struct and
+//! pass it to `Nitrox::with_state(state)`. Handlers access connection pools directly via `req.state.db`.
 
 #![doc(html_root_url = "https://docs.rs/nitrox/0.0.1")]
 #![allow(missing_docs)] // TODO: Add docs for all public items before 1.0

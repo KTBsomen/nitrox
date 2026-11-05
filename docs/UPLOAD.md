@@ -1,4 +1,4 @@
-# 📁 File Upload Guide
+# File Upload Guide
 
 Nitrox provides a powerful file upload module similar to Express's Multer.
 

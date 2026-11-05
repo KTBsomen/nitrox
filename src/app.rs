@@ -44,26 +44,27 @@ use tracing::{error, info};
 ///
 /// This is the type signature for route handlers. Handlers receive a [`Request`]
 /// and [`Response`], and return a [`Future`] that resolves to a [`Response`].
-pub type HandlerFn =
-    Arc<dyn Fn(Request, Response) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
+pub type HandlerFn<S = ()> =
+    Arc<dyn Fn(Request<S>, Response) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
 /// Immutable server state used during serving to achieve lock-free routing and middleware dispatch.
-pub struct ServerState {
-    router: Router,
-    middlewares: Arc<Vec<MiddlewareFn>>,
+pub struct ServerState<S = ()> {
+    pub router: Router<S>,
+    pub middlewares: Arc<Vec<MiddlewareFn<S>>>,
     #[allow(dead_code)]
-    settings: AppSettings,
+    pub settings: AppSettings,
+    pub state: Arc<S>,
 }
 
-impl ServerState {
+impl<S: Send + Sync + 'static> ServerState<S> {
     /// Handle an incoming HTTP request without locking
     pub async fn handle_request(
         &self,
         req: hyper::Request<Incoming>,
         remote_addr: SocketAddr,
     ) -> hyper::Response<Full<Bytes>> {
-        // Convert hyper request to our Request type
-        let request = match Request::from_hyper(req, remote_addr).await {
+        // Convert hyper request to our Request type with application state
+        let request = match Request::from_hyper_with_state(req, remote_addr, Arc::clone(&self.state)).await {
             Ok(r) => r,
             Err(e) => {
                 error!("Failed to parse request: {:?}", e);
@@ -106,17 +107,17 @@ impl ServerState {
 
     /// Recursively compose and execute middleware in registered order
     fn run_middleware_chain(
-        middlewares: Arc<Vec<MiddlewareFn>>,
+        middlewares: Arc<Vec<MiddlewareFn<S>>>,
         index: usize,
-        req: Request,
+        req: Request<S>,
         res: Response,
-        terminal_handler: HandlerFn,
+        terminal_handler: HandlerFn<S>,
     ) -> Pin<Box<dyn Future<Output = Response> + Send>> {
         if index < middlewares.len() {
             let mw = Arc::clone(&middlewares[index]);
             let next_mws = Arc::clone(&middlewares);
             let next_handler = Arc::clone(&terminal_handler);
-            let next: Next = Arc::new(move |req, res| {
+            let next: Next<S> = Arc::new(move |req, res| {
                 Self::run_middleware_chain(
                     Arc::clone(&next_mws),
                     index + 1,
@@ -164,14 +165,15 @@ impl ServerState {
 ///     app.listen(3000).await
 /// }
 /// ```
-pub struct Nitrox {
-    router: Arc<std::sync::RwLock<Router>>,
-    middleware_stack: Arc<std::sync::RwLock<MiddlewareStack>>,
+pub struct Nitrox<S = ()> {
+    router: Arc<std::sync::RwLock<Router<S>>>,
+    middleware_stack: Arc<std::sync::RwLock<MiddlewareStack<S>>>,
     settings: Arc<std::sync::RwLock<AppSettings>>,
+    state: Arc<S>,
 }
 
 /// Backward compatibility alias for [`Nitrox`].
-pub type RustyX = Nitrox;
+pub type RustyX<S = ()> = Nitrox<S>;
 
 /// Application settings configuration.
 ///
@@ -202,8 +204,8 @@ impl Default for AppSettings {
     }
 }
 
-impl Nitrox {
-    /// Creates a new Nitrox application instance.
+impl Nitrox<()> {
+    /// Creates a new Nitrox application instance with default empty unit state.
     ///
     /// # Example
     ///
@@ -213,11 +215,72 @@ impl Nitrox {
     /// let app = Nitrox::new();
     /// ```
     pub fn new() -> Self {
+        Self::with_state(())
+    }
+}
+
+impl<S: Send + Sync + 'static> Nitrox<S> {
+    /// Creates a new Nitrox application instance with shared application state.
+    ///
+    /// The state type `S` is automatically wrapped in an [`Arc`] and injected into
+    /// every [`Request`], accessible directly via `req.state`.
+    ///
+    /// # Trait Bounds and Requirements
+    ///
+    /// The application state `S` must satisfy:
+    /// - [`Send`] - Safe to transfer across thread boundaries.
+    /// - [`Sync`] - Safe for concurrent references across multiple threads.
+    /// - `'static` - Outlives temporary function or stack scopes.
+    ///
+    /// # Permitted State Types
+    ///
+    /// The following types are safe and recommended for use in application state:
+    /// - Connection pools (`sqlx::PgPool`, `sqlx::MySqlPool`, `deadpool_redis::Pool`, `bb8::Pool`)
+    /// - HTTP clients (`reqwest::Client`)
+    /// - Thread-safe synchronized caches (`dashmap::DashMap`, `parking_lot::RwLock<HashMap<K, V>>`, `moka::future::Cache`)
+    /// - Tokio channels (`tokio::sync::mpsc::Sender`, `tokio::sync::broadcast::Sender`)
+    /// - Atomic primitives (`std::sync::atomic::AtomicU64`, `AtomicBool`)
+    /// - Read-mostly synchronized configuration (`arc_swap::ArcSwap<Config>`)
+    ///
+    /// # Limitations and Disallowed Types
+    ///
+    /// - **Non-Send/Non-Sync types:** Types such as `Rc<T>`, `RefCell<T>`, `std::cell::Cell<T>`,
+    ///   or raw pointers cannot be used because requests are processed concurrently across Tokio worker threads.
+    ///   Use `Arc<T>` and `parking_lot::RwLock<T>` or `tokio::sync::RwLock<T>` instead.
+    /// - **Non-'static references:** Borrowed references with temporary lifetimes (`&'a T`) cannot be stored
+    ///   in state; state must own its data or hold `'static` references.
+    /// - **Blocking Mutex across await:** Avoid holding `std::sync::MutexGuard` across an `.await` boundary,
+    ///   as it is not `Send` and can cause worker thread pool starvation. Use `tokio::sync::Mutex` if a lock
+    ///   must span across asynchronous operations.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use nitrox::prelude::*;
+    ///
+    /// struct AppState {
+    ///     env: String,
+    /// }
+    ///
+    /// let app = Nitrox::with_state(AppState { env: "production".to_string() });
+    /// ```
+    pub fn with_state(state: S) -> Self {
         Self {
-            router: Arc::new(std::sync::RwLock::new(Router::new())),
+            router: Arc::new(std::sync::RwLock::new(Router::with_state())),
             middleware_stack: Arc::new(std::sync::RwLock::new(MiddlewareStack::new())),
             settings: Arc::new(std::sync::RwLock::new(AppSettings::default())),
+            state: Arc::new(state),
         }
+    }
+
+    /// Access reference to application state
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+
+    /// Clone the Arc pointing to application state
+    pub fn state_arc(&self) -> Arc<S> {
+        Arc::clone(&self.state)
     }
 
     /// Set an application setting
@@ -242,7 +305,7 @@ impl Nitrox {
     /// Add middleware to the application
     pub fn use_middleware<F, Fut>(&self, middleware: F) -> &Self
     where
-        F: Fn(Request, Response, Next) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response, Next<S>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         if let Ok(mut stack) = self.middleware_stack.write() {
@@ -254,7 +317,7 @@ impl Nitrox {
     }
 
     /// Mount a router at a specific path prefix
-    pub fn use_router(&self, path: &str, router: Router) -> &Self {
+    pub fn use_router(&self, path: &str, router: Router<S>) -> &Self {
         if let Ok(mut main_router) = self.router.write() {
             main_router.mount(path, router);
         }
@@ -264,7 +327,7 @@ impl Nitrox {
     /// Register a GET route handler
     pub fn get<F, Fut>(&self, path: &str, handler: F) -> &Self
     where
-        F: Fn(Request, Response) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         self.route(Method::GET, path, handler)
@@ -273,7 +336,7 @@ impl Nitrox {
     /// Register a POST route handler
     pub fn post<F, Fut>(&self, path: &str, handler: F) -> &Self
     where
-        F: Fn(Request, Response) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         self.route(Method::POST, path, handler)
@@ -282,7 +345,7 @@ impl Nitrox {
     /// Register a PUT route handler
     pub fn put<F, Fut>(&self, path: &str, handler: F) -> &Self
     where
-        F: Fn(Request, Response) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         self.route(Method::PUT, path, handler)
@@ -291,7 +354,7 @@ impl Nitrox {
     /// Register a DELETE route handler
     pub fn delete<F, Fut>(&self, path: &str, handler: F) -> &Self
     where
-        F: Fn(Request, Response) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         self.route(Method::DELETE, path, handler)
@@ -300,7 +363,7 @@ impl Nitrox {
     /// Register a PATCH route handler
     pub fn patch<F, Fut>(&self, path: &str, handler: F) -> &Self
     where
-        F: Fn(Request, Response) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         self.route(Method::PATCH, path, handler)
@@ -309,7 +372,7 @@ impl Nitrox {
     /// Internal method to register a route
     fn route<F, Fut>(&self, method: Method, path: &str, handler: F) -> &Self
     where
-        F: Fn(Request, Response) -> Fut + Send + Sync + 'static,
+        F: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Response> + Send + 'static,
     {
         if let Ok(mut router) = self.router.write() {
@@ -325,7 +388,7 @@ impl Nitrox {
     /// Start the HTTP server and listen on the specified port
     pub async fn listen(self, port: u16) -> Result<()> {
         self.listen_with_callback(port, || {
-            info!("🚀 Nitrox server running at http://localhost:{}", port);
+            info!("Nitrox server running at http://localhost:{}", port);
         })
         .await
     }
@@ -345,6 +408,7 @@ impl Nitrox {
             router: self.router.read().unwrap().clone(),
             middlewares: Arc::new(self.middleware_stack.read().unwrap().get_middlewares()),
             settings: self.settings.read().unwrap().clone(),
+            state: Arc::clone(&self.state),
         });
 
         loop {
@@ -372,18 +436,19 @@ impl Nitrox {
     }
 }
 
-impl Default for Nitrox {
+impl Default for Nitrox<()> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Clone for Nitrox {
+impl<S> Clone for Nitrox<S> {
     fn clone(&self) -> Self {
         Self {
             router: Arc::clone(&self.router),
             middleware_stack: Arc::clone(&self.middleware_stack),
             settings: Arc::clone(&self.settings),
+            state: Arc::clone(&self.state),
         }
     }
 }

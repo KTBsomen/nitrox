@@ -62,3 +62,55 @@ async fn test_upload_filename_traversal_sanitized() {
     // Clean up
     let _ = tokio::fs::remove_dir_all("./test_uploads").await;
 }
+
+
+#[tokio::test]
+async fn test_state_direct_access_and_router() {
+    #[derive(Clone)]
+    struct MockRedis {
+        connected: bool,
+    }
+
+    struct TestAppState {
+        redis: MockRedis,
+        env: String,
+    }
+
+    let mut router = Router::<TestAppState>::with_state();
+    router.get("/info", |req, res| async move {
+        let redis_status = req.state.redis.connected;
+        let env = &req.state.env;
+        res.json(json!({
+            "redis": redis_status,
+            "env": env
+        }))
+    });
+
+    let (handler, _params) = router
+        .find_route(&hyper::Method::GET, "/info")
+        .expect("Route /info should match");
+
+    let _ = handler;
+}
+
+#[tokio::test]
+async fn test_app_with_state_instantiation() {
+    struct CustomState {
+        counter: std::sync::atomic::AtomicUsize,
+        service_name: String,
+    }
+
+    let state = CustomState {
+        counter: std::sync::atomic::AtomicUsize::new(42),
+        service_name: "payment-gateway".to_string(),
+    };
+
+    let app = Nitrox::with_state(state);
+    assert_eq!(app.state().service_name, "payment-gateway");
+    assert_eq!(app.state().counter.load(std::sync::atomic::Ordering::SeqCst), 42);
+
+    app.get("/status", |req, res| async move {
+        let count = req.state.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        res.json(json!({ "count": count, "service": req.state.service_name }))
+    });
+}

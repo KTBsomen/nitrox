@@ -4,7 +4,7 @@
 //! - Config (Environment-driven configuration)
 //! - Models & DTOs (Serde serialization & validation)
 //! - Services (Thread-safe business logic & state)
-//! - Controllers (HTTP request handlers)
+//! - Controllers (Zero-clone HTTP request handlers via req.state)
 //! - Middleware (Logging, Request ID, Error Handling)
 //! - Routes (Modular sub-routers mounted with prefixes)
 
@@ -32,13 +32,13 @@ async fn main() -> Result<()> {
 
     // 2. Load environment configuration
     let config = AppConfig::from_env();
-    info!("🔧 Configuration loaded for environment: {:?}", config.environment);
+    info!("Configuration loaded for environment: {:?}", config.environment);
 
     // 3. Initialize Shared Application State & Services
     let state = AppState::new(config.clone());
 
-    // 4. Initialize Nitrox application
-    let app = Nitrox::new();
+    // 4. Initialize Nitrox application with shared state
+    let app = Nitrox::with_state(state);
 
     // 5. Global Middlewares
     app.use_middleware(middleware::request_id_middleware);
@@ -75,10 +75,10 @@ async fn main() -> Result<()> {
         }))
     });
 
-    // 7. Mount Modular Routes
-    routes::configure_routes(&app, state);
+    // 7. Mount Modular Routes (zero controller clones)
+    routes::configure_routes(&app);
 
     // 8. Start HTTP Server
-    info!("🚀 Starting {} server on port {}...", config.app_name, config.server_port);
+    info!("Starting {} server on port {}...", config.app_name, config.server_port);
     app.listen(config.server_port).await
 }

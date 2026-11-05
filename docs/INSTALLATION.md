@@ -1,4 +1,4 @@
-# 📦 Installation Guide
+# Installation Guide
 
 This guide will help you install and set up Nitrox for your project.
 

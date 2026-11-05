@@ -1,4 +1,4 @@
-# 🔌 Middleware Guide
+# Middleware Guide
 
 Middleware functions are the backbone of request processing in Nitrox. They can modify requests, responses, and control the flow of request handling.
 
@@ -276,14 +276,14 @@ app.use_middleware(|req, res, next| async move {
 Middleware executes in the order it's added. Order matters!
 
 ```rust
-// ✅ Correct order
+//  Correct order
 app.use_middleware(request_id());      // Add request ID first
 app.use_middleware(logger());          // Then log (includes request ID)
 app.use_middleware(cors("*"));         // CORS before auth
 app.use_middleware(auth_middleware()); // Auth before rate limiting
 app.use_middleware(rate_limiter(...)); // Rate limit authenticated users
 
-// ❌ Wrong order
+//  Wrong order
 app.use_middleware(rate_limiter(...)); // Rate limiting won't know the user
 app.use_middleware(auth_middleware()); // Auth happens too late
 ```

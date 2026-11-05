@@ -145,12 +145,12 @@ pub enum RateLimitResult {
 /// let config = RateLimiterConfig::new(100, 60); // 100 requests per minute
 /// app.use_middleware(rate_limiter(config));
 /// ```
-pub fn rate_limiter(
+pub fn rate_limiter<S: Send + Sync + 'static>(
     config: RateLimiterConfig,
 ) -> impl Fn(
-    Request,
+    Request<S>,
     Response,
-    Next,
+    Next<S>,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>>
        + Send
        + Sync
@@ -158,7 +158,7 @@ pub fn rate_limiter(
        + 'static {
     let limiter = RateLimiter::new(config.clone());
 
-    move |req: Request, res: Response, next: Next| {
+    move |req: Request<S>, res: Response, next: Next<S>| {
         let limiter = limiter.clone();
         let config = config.clone();
 
@@ -198,13 +198,13 @@ pub fn rate_limiter(
 }
 
 /// Simple rate limiter - shorthand for common use cases
-pub fn simple_rate_limit(
+pub fn simple_rate_limit<S: Send + Sync + 'static>(
     max_requests: u32,
     window_secs: u64,
 ) -> impl Fn(
-    Request,
+    Request<S>,
     Response,
-    Next,
+    Next<S>,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>>
        + Send
        + Sync

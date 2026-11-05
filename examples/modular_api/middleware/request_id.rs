@@ -4,7 +4,11 @@ use nitrox::middleware::Next;
 use nitrox::{Request, Response};
 use uuid::Uuid;
 
-pub async fn request_id_middleware(req: Request, res: Response, next: Next) -> Response {
+pub async fn request_id_middleware<S: Send + Sync + 'static>(
+    req: Request<S>,
+    res: Response,
+    next: Next<S>,
+) -> Response {
     let request_id = req
         .header("x-request-id")
         .map(|s| s.to_string())
