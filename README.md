@@ -523,15 +523,40 @@ app.use_router("/assets", static_handler(static_cfg));
 
 Stress tests were conducted on real HTTP network loopback sockets using [Bombardier](https://github.com/codesenberg/bombardier) in release mode (`opt-level = 3`, `lto = true`).
 
-### Bombardier HTTP Load Test (50,000 to 100,000 Requests)
+### Linux Production Benchmarks (WSL2 with Jemalloc & epoll)
 
-| Benchmark Target | Concurrency | Total Requests | Requests/Sec (Avg) | Latency (Mean) | Success Rate | Throughput |
-|---|---|---|---|---|---|---|
-| **Health Check (`/health`)** | 50 conns | 50,000 | **69,583.46 req/s** (Peak: 80,928) | **710.76 µs** | 100.00% (50k/50k) | 22.01 MB/s |
-| **Enterprise Users API (`/api/v1/users`)** | 50 conns | 50,000 | **67,383.23 req/s** (Peak: 80,251) | **741.80 µs** | 100.00% (50k/50k) | 44.70 MB/s |
-| **High Concurrency Load (`/api/v1/users`)** | 100 conns | 100,000 | **69,239.62 req/s** (Peak: 88,057) | **1.44 ms** | 100.00% (100k/100k) | 46.42 MB/s |
+| Benchmark Target | Concurrency | Total Requests | Requests/Sec (Avg) | Peak Reqs/Sec | Latency (Mean) | Success Rate | Throughput |
+|---|---|---|---|---|---|---|---|
+| **Health Check (`/health`)** | 50 conns | 50,000 | **104,789.63 req/s** | **126,105 req/s** | **469.14 µs** | 100.00% (50k/50k) | 33.19 MB/s |
+| **Enterprise Users API (`/api/v1/users`)** | 50 conns | 50,000 | **105,771.81 req/s** | **132,553 req/s** | **469.67 µs** | 100.00% (50k/50k) | 71.19 MB/s |
+| **High Concurrency Load (`/api/v1/users`)** | 100 conns | 100,000 | **149,747.11 req/s** | **184,237 req/s** | **672.98 µs** | 100.00% (100k/100k) | 98.42 MB/s |
 
-*Hardware context: Standard windows laptop environment. Endpoint `/api/v1/users` includes sub-router prefix matching, query string parsing, UUID request ID middleware, memory lock lookups, pagination, and dynamic JSON serialization.*
+### Windows Development Benchmarks (Native MSVC CRT Allocator)
+
+| Benchmark Target | Concurrency | Total Requests | Requests/Sec (Avg) | Peak Reqs/Sec | Latency (Mean) | Success Rate | Throughput |
+|---|---|---|---|---|---|---|---|
+| **Health Check (`/health`)** | 50 conns | 50,000 | **74,419.36 req/s** | **91,297 req/s** | **666.76 µs** | 100.00% (50k/50k) | 23.29 MB/s |
+| **Enterprise Users API (`/api/v1/users`)** | 50 conns | 50,000 | **66,352.52 req/s** | **80,340 req/s** | **747.15 µs** | 100.00% (50k/50k) | 44.72 MB/s |
+
+*Hardware context: Standard workstation environment. Endpoint `/api/v1/users` includes sub-router prefix matching, query string parsing, UUID request ID middleware, memory lock lookups, pagination, and dynamic JSON serialization.*
+
+### Peak Performance with Jemalloc Macro
+
+For maximum throughput on Linux multi-core servers, invoke `nitrox::enable_jemalloc!()` at the top of your `main.rs`:
+
+```rust
+use nitrox::prelude::*;
+
+// Automatically enables Jemalloc on Linux; safely no-ops on Windows and macOS
+nitrox::enable_jemalloc!();
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let app = Nitrox::new();
+    app.get("/", |_req, res| async move { res.send("OK") });
+    app.listen(3000).await
+}
+```
 
 Detailed benchmark reproducible scripts are available under [`examples/state_benchmark`](examples/state_benchmark) and [`examples/modular_api`](examples/modular_api).
 ### Benchmarks With Axum Express.js Fastify

@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "nitrox"
-version = "0.0.2"
+version = "0.0.3"
 authors = [
     "Somen Das <somen8099@gmail.com>",
 ]
@@ -141,6 +141,9 @@ features = ["json"]
 
 [dev-dependencies.tokio-test]
 version = "0.4.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.7"
 
 [profile.release]
 opt-level = 3

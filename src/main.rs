@@ -4,6 +4,8 @@
 
 use nitrox::prelude::*;
 
+nitrox::enable_jemalloc!();
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging

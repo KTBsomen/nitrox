@@ -77,22 +77,20 @@ impl<S: Send + Sync + 'static> ServerState<S> {
 
         let response = Response::new();
 
-        // Lock-free route lookup directly on immutable router
-        let handler_and_params = self
-            .router
-            .find_route(request.method(), request.path())
-            .map(|(h, p)| (Arc::clone(h), p));
-
-        if let Some((handler, params)) = handler_and_params {
+        // Lock-free route lookup directly on immutable router without Arc cloning on fast path
+        if let Some((handler_ref, params)) = self.router.find_route(request.method(), request.path()) {
             let mut request = request;
-            request.set_params(params);
+            if !params.is_empty() {
+                request.set_params(params);
+            }
 
             if self.middlewares.is_empty() {
-                // Zero-overhead fast path: invoke route handler directly
-                let response = handler(request, response).await;
+                // Zero-overhead fast path: invoke route handler directly without Arc clone
+                let response = handler_ref(request, response).await;
                 response.into_hyper()
             } else {
-                // Execute middleware pipeline
+                // Execute middleware pipeline: clone Arc only when branching into middlewares
+                let handler = Arc::clone(handler_ref);
                 let mws = Arc::clone(&self.middlewares);
                 let response = Self::run_middleware_chain(mws, 0, request, response, handler).await;
                 response.into_hyper()
@@ -428,7 +426,10 @@ impl<S: Send + Sync + 'static> Nitrox<S> {
                     }
                 });
 
-                if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                let mut builder = http1::Builder::new();
+                builder.pipeline_flush(true);
+
+                if let Err(err) = builder.serve_connection(io, service).await {
                     error!("Error serving connection: {:?}", err);
                 }
             });

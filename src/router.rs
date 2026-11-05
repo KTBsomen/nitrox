@@ -106,10 +106,15 @@ impl<S: Send + Sync + 'static> Router<S> {
     ) -> Option<(&HandlerFn<S>, HashMap<String, String>)> {
         if let Some(router) = self.routes.get(method) {
             if let Ok(matched) = router.at(path) {
-                let mut params = HashMap::with_capacity(matched.params.len());
-                for (k, v) in matched.params.iter() {
-                    params.insert(k.to_string(), v.to_string());
-                }
+                let params = if matched.params.is_empty() {
+                    HashMap::new()
+                } else {
+                    let mut params = HashMap::with_capacity(matched.params.len());
+                    for (k, v) in matched.params.iter() {
+                        params.insert(k.to_string(), v.to_string());
+                    }
+                    params
+                };
                 return Some((&matched.value.handler, params));
             }
         }

@@ -303,6 +303,37 @@ pub use static_files::{static_handler, StaticConfig};
 pub use upload::{UploadConfig, UploadedFile, Uploader};
 pub use websocket::{WsMessage, WsRoom, WsServer};
 
+#[cfg(target_os = "linux")]
+pub use tikv_jemallocator;
+
+/// Configures `jemalloc` as the global memory allocator on Linux for peak multi-threaded throughput.
+///
+/// On non-Linux platforms (Windows, macOS), this macro safely expands to nothing,
+/// allowing the application to compile and run with the native platform allocator.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use nitrox::prelude::*;
+///
+/// nitrox::enable_jemalloc!();
+///
+/// #[tokio::main]
+/// async fn main() -> Result<()> {
+///     let app = Nitrox::new();
+///     app.listen(3000).await
+/// }
+/// ```
+#[macro_export]
+macro_rules! enable_jemalloc {
+    () => {
+        #[cfg(target_os = "linux")]
+        #[global_allocator]
+        static __NITROX_GLOBAL_ALLOCATOR: $crate::tikv_jemallocator::Jemalloc =
+            $crate::tikv_jemallocator::Jemalloc;
+    };
+}
+
 /// Prelude module for convenient imports.
 ///
 /// Import everything you need with a single line:
@@ -337,6 +368,7 @@ pub mod prelude {
         UploadError, UploadedFile, Uploader,
     };
     pub use crate::websocket::{WsMessage, WsRoom, WsServer};
+    pub use crate::enable_jemalloc;
     pub use async_trait::async_trait;
     pub use serde::{Deserialize, Serialize};
     pub use serde_json::{json, Value};

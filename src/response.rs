@@ -265,15 +265,19 @@ impl Response {
         )
     }
 
-    /// Convert to hyper Response
-    pub fn into_hyper(self) -> hyper::Response<Full<Bytes>> {
-        let mut response = hyper::Response::builder().status(self.status);
-
-        for (name, value) in self.headers.iter() {
-            response = response.header(name, value);
+    /// Convert to hyper Response with zero-copy header move and automatic content-length
+    pub fn into_hyper(mut self) -> hyper::Response<Full<Bytes>> {
+        if !self.headers.contains_key(header::CONTENT_LENGTH) {
+            self.headers.insert(
+                header::CONTENT_LENGTH,
+                header::HeaderValue::from(self.body.len()),
+            );
         }
 
-        response.body(Full::new(self.body)).unwrap()
+        let mut response = hyper::Response::new(Full::new(self.body));
+        *response.status_mut() = self.status;
+        *response.headers_mut() = self.headers;
+        response
     }
 
     /// Get the current status code

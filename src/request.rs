@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use hyper::body::Incoming;
+use hyper::body::{Body, Incoming};
 use hyper::{header::HeaderValue, HeaderMap, Method, Uri, Version};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -65,14 +65,19 @@ impl<S> Request<S> {
             })
             .unwrap_or_default();
 
-        // Collect body bytes with 10MB upper limit to prevent OOM DoS attacks
-        const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
-        let limited = http_body_util::Limited::new(body, MAX_BODY_SIZE);
-        let body_bytes = limited
-            .collect()
-            .await
-            .map_err(|e| Error::BadRequest(format!("Failed to read request body (max 10MB): {}", e)))?
-            .to_bytes();
+        // Fast path: if the body stream is already at EOF (e.g. GET/HEAD/empty requests),
+        // skip allocating and awaiting the stream collector entirely.
+        let body_bytes = if body.is_end_stream() {
+            Bytes::new()
+        } else {
+            const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+            let limited = http_body_util::Limited::new(body, MAX_BODY_SIZE);
+            limited
+                .collect()
+                .await
+                .map_err(|e| Error::BadRequest(format!("Failed to read request body (max 10MB): {}", e)))?
+                .to_bytes()
+        };
 
         Ok(Self {
             method: parts.method,
@@ -151,10 +156,15 @@ impl<S> Request<S> {
         &self.body
     }
 
-    /// Get the body as a string
-    pub fn body_string(&self) -> Result<String> {
-        String::from_utf8(self.body.to_vec())
+    /// Borrow the body as a UTF-8 string slice with zero heap allocations.
+    pub fn body_str(&self) -> Result<&str> {
+        std::str::from_utf8(&self.body)
             .map_err(|_| Error::ParseError("Invalid UTF-8 in body".to_string()))
+    }
+
+    /// Get the body as an owned String, validating UTF-8 before allocating.
+    pub fn body_string(&self) -> Result<String> {
+        self.body_str().map(|s| s.to_string())
     }
 
     /// Parse the body as JSON
@@ -275,5 +285,46 @@ impl<S> Request<S> {
         self.authorization()
             .filter(|auth| auth.starts_with("Bearer "))
             .map(|auth| &auth[7..])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_body_str_and_string() {
+        let req = Request {
+            method: Method::POST,
+            uri: "/test".parse().unwrap(),
+            version: Version::HTTP_11,
+            headers: HeaderMap::new(),
+            body: Bytes::from_static(b"{\"hello\":\"world\"}"),
+            params: HashMap::new(),
+            query: HashMap::new(),
+            remote_addr: "127.0.0.1:8080".parse().unwrap(),
+            state: Arc::new(()),
+        };
+
+        assert_eq!(req.body_str().unwrap(), "{\"hello\":\"world\"}");
+        assert_eq!(req.body_string().unwrap(), "{\"hello\":\"world\"}".to_string());
+    }
+
+    #[test]
+    fn test_invalid_utf8_body() {
+        let req = Request {
+            method: Method::POST,
+            uri: "/test".parse().unwrap(),
+            version: Version::HTTP_11,
+            headers: HeaderMap::new(),
+            body: Bytes::from_static(&[0xFF, 0xFE, 0xFD]),
+            params: HashMap::new(),
+            query: HashMap::new(),
+            remote_addr: "127.0.0.1:8080".parse().unwrap(),
+            state: Arc::new(()),
+        };
+
+        assert!(req.body_str().is_err());
+        assert!(req.body_string().is_err());
     }
 }

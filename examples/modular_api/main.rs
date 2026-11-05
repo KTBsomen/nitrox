@@ -21,6 +21,8 @@ use nitrox::prelude::*;
 use services::AppState;
 use tracing::info;
 
+nitrox::enable_jemalloc!();
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // 1. Initialize structured logging
