@@ -75,7 +75,9 @@ impl<S> Request<S> {
             limited
                 .collect()
                 .await
-                .map_err(|e| Error::BadRequest(format!("Failed to read request body (max 10MB): {}", e)))?
+                .map_err(|e| {
+                    Error::BadRequest(format!("Failed to read request body (max 10MB): {}", e))
+                })?
                 .to_bytes()
         };
 
@@ -220,8 +222,8 @@ impl<S> Request<S> {
     }
 
     /// Get a specific query parameter
-    pub fn query_param(&self, name: &str) -> Option<&String> {
-        self.query.get(name)
+    pub fn query_param(&self, name: &str) -> Option<&str> {
+        self.query.get(name).map(|s| s.as_str())
     }
 
     /// Get the remote address of the client
@@ -307,7 +309,10 @@ mod tests {
         };
 
         assert_eq!(req.body_str().unwrap(), "{\"hello\":\"world\"}");
-        assert_eq!(req.body_string().unwrap(), "{\"hello\":\"world\"}".to_string());
+        assert_eq!(
+            req.body_string().unwrap(),
+            "{\"hello\":\"world\"}".to_string()
+        );
     }
 
     #[test]
