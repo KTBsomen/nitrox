@@ -2,7 +2,7 @@
 
 use crate::models::{CreateUserDto, UpdateUserDto};
 use crate::services::AppState;
-use crate::utils::{ok, paginated};
+use crate::utils::{created, ok, paginated};
 use nitrox::{Request, Response};
 
 pub struct UserController;
@@ -27,11 +27,7 @@ impl UserController {
     pub async fn create_user(req: Request<AppState>, res: Response) -> Response {
         match req.json::<CreateUserDto>() {
             Ok(dto) => match req.state.user_service.create(dto).await {
-                Ok(user) => res.status(201).json(serde_json::json!({
-                    "success": true,
-                    "message": "User created successfully",
-                    "data": user
-                })),
+                Ok(user) => created(res, "User created successfully", user),
                 Err(err) => err.to_response(res),
             },
             Err(e) => res.bad_request(&format!("Invalid JSON body: {}", e)),

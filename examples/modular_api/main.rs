@@ -54,6 +54,7 @@ async fn main() -> Result<()> {
             "endpoints": {
                 "health": "/health",
                 "metrics": "/metrics",
+                "echo": "POST /api/v1/echo",
                 "auth": {
                     "login": "POST /api/v1/auth/login",
                     "register": "POST /api/v1/auth/register",
@@ -75,6 +76,14 @@ async fn main() -> Result<()> {
                 }
             }
         }))
+    });
+
+    // High-performance echo endpoint for payload benchmarking
+    app.post("/api/v1/echo", |req, res| async move {
+        match req.json::<models::CreateUserDto>() {
+            Ok(dto) => res.status(201).json(dto),
+            Err(e) => res.bad_request(&e.to_string()),
+        }
     });
 
     // 7. Mount Modular Routes (zero controller clones)

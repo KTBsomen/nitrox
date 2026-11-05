@@ -8,7 +8,8 @@ use serde_json::json;
 #[derive(Serialize)]
 pub struct ApiResponse<T: Serialize> {
     pub success: bool,
-    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<&'static str>,
     pub data: T,
 }
 
@@ -30,18 +31,19 @@ pub struct PaginationMeta {
 }
 
 pub fn ok<T: Serialize>(res: Response, data: T) -> Response {
-    res.json(json!({
-        "success": true,
-        "data": data
-    }))
+    res.json(ApiResponse {
+        success: true,
+        message: None,
+        data,
+    })
 }
 
-pub fn created<T: Serialize>(res: Response, message: &str, data: T) -> Response {
-    res.status(201).json(json!({
-        "success": true,
-        "message": message,
-        "data": data
-    }))
+pub fn created<T: Serialize>(res: Response, message: &'static str, data: T) -> Response {
+    res.status(201).json(ApiResponse {
+        success: true,
+        message: Some(message),
+        data,
+    })
 }
 
 pub fn paginated<T: Serialize>(

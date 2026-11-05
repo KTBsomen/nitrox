@@ -3,9 +3,9 @@
 use crate::models::{CreateProductDto, Product, ProductCategory, ProductFilterQuery, UpdateProductDto};
 use crate::utils::AppError;
 use chrono::Utc;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -71,47 +71,49 @@ impl ProductService {
     }
 
     pub async fn query(&self, filter: ProductFilterQuery) -> (Vec<Product>, usize) {
-        let store = self.products.read().await;
-        let mut list: Vec<Product> = store
-            .values()
-            .filter(|p| {
-                if !p.is_active {
-                    return false;
-                }
-                if let Some(ref search) = filter.search {
-                    let needle = search.to_lowercase();
-                    if !p.title.to_lowercase().contains(&needle)
-                        && !p.description.to_lowercase().contains(&needle)
-                    {
+        let mut list: Vec<Product> = {
+            let store = self.products.read();
+            store
+                .values()
+                .filter(|p| {
+                    if !p.is_active {
                         return false;
                     }
-                }
-                if let Some(ref cat_str) = filter.category {
-                    let cat_match = match cat_str.to_lowercase().as_str() {
-                        "electronics" => p.category == ProductCategory::Electronics,
-                        "clothing" => p.category == ProductCategory::Clothing,
-                        "books" => p.category == ProductCategory::Books,
-                        "home" => p.category == ProductCategory::Home,
-                        _ => true,
-                    };
-                    if !cat_match {
-                        return false;
+                    if let Some(ref search) = filter.search {
+                        let needle = search.to_lowercase();
+                        if !p.title.to_lowercase().contains(&needle)
+                            && !p.description.to_lowercase().contains(&needle)
+                        {
+                            return false;
+                        }
                     }
-                }
-                if let Some(min) = filter.min_price {
-                    if p.price < min {
-                        return false;
+                    if let Some(ref cat_str) = filter.category {
+                        let cat_match = match cat_str.to_lowercase().as_str() {
+                            "electronics" => p.category == ProductCategory::Electronics,
+                            "clothing" => p.category == ProductCategory::Clothing,
+                            "books" => p.category == ProductCategory::Books,
+                            "home" => p.category == ProductCategory::Home,
+                            _ => true,
+                        };
+                        if !cat_match {
+                            return false;
+                        }
                     }
-                }
-                if let Some(max) = filter.max_price {
-                    if p.price > max {
-                        return false;
+                    if let Some(min) = filter.min_price {
+                        if p.price < min {
+                            return false;
+                        }
                     }
-                }
-                true
-            })
-            .cloned()
-            .collect();
+                    if let Some(max) = filter.max_price {
+                        if p.price > max {
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .cloned()
+                .collect()
+        };
 
         list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
@@ -123,8 +125,8 @@ impl ProductService {
     }
 
     pub async fn get_by_id(&self, id: &str) -> Result<Product, AppError> {
-        let store = self.products.read().await;
-        store
+        self.products
+            .read()
             .get(id)
             .cloned()
             .ok_or_else(|| AppError::NotFound(format!("Product with id '{}' not found", id)))
@@ -138,7 +140,7 @@ impl ProductService {
             return Err(AppError::BadRequest("Product price must be greater than 0".to_string()));
         }
 
-        let mut store = self.products.write().await;
+        // Generate ID, timestamp, and struct OUTSIDE the lock
         let id = format!("prd_{}", Uuid::new_v4().simple());
         let now = Utc::now();
         let product = Product {
@@ -153,12 +155,12 @@ impl ProductService {
             updated_at: now,
         };
 
-        store.insert(id, product.clone());
+        self.products.write().insert(id, product.clone());
         Ok(product)
     }
 
     pub async fn update(&self, id: &str, dto: UpdateProductDto) -> Result<Product, AppError> {
-        let mut store = self.products.write().await;
+        let mut store = self.products.write();
         let product = store
             .get_mut(id)
             .ok_or_else(|| AppError::NotFound(format!("Product with id '{}' not found", id)))?;
@@ -198,8 +200,7 @@ impl ProductService {
     }
 
     pub async fn delete(&self, id: &str) -> Result<bool, AppError> {
-        let mut store = self.products.write().await;
-        if store.remove(id).is_some() {
+        if self.products.write().remove(id).is_some() {
             Ok(true)
         } else {
             Err(AppError::NotFound(format!("Product with id '{}' not found", id)))
