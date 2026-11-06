@@ -9,10 +9,16 @@ pub struct ProductController;
 
 impl ProductController {
     pub async fn list_products(req: Request<AppState>, res: Response) -> Response {
-        let page: u32 = req.query_param("page").and_then(|v| v.parse().ok()).unwrap_or(1);
-        let limit: u32 = req.query_param("limit").and_then(|v| v.parse().ok()).unwrap_or(10);
-        let search = req.query_param("q").cloned();
-        let category = req.query_param("category").cloned();
+        let page: u32 = req
+            .query_param("page")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1);
+        let limit: u32 = req
+            .query_param("limit")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10);
+        let search = req.query_param("q").and_then(|v| v.parse().ok());
+        let category = req.query_param("category").and_then(|v| v.parse().ok());
         let min_price = req.query_param("min_price").and_then(|v| v.parse().ok());
         let max_price = req.query_param("max_price").and_then(|v| v.parse().ok());
 
@@ -61,7 +67,10 @@ impl ProductController {
     pub async fn delete_product(req: Request<AppState>, res: Response) -> Response {
         let id = req.param("id").cloned().unwrap_or_default();
         match req.state.product_service.delete(&id).await {
-            Ok(_) => ok(res, serde_json::json!({ "message": "Product deleted", "id": id })),
+            Ok(_) => ok(
+                res,
+                serde_json::json!({ "message": "Product deleted", "id": id }),
+            ),
             Err(err) => err.to_response(res),
         }
     }
