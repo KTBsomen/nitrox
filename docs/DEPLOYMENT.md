@@ -408,6 +408,26 @@ cargo build --release
 
 ## Reverse Proxy Setup
 
+### Caddy Configuration (Zero-Config Auto-HTTPS)
+
+Caddy automatically provisions, manages, and auto-renews Let's Encrypt and ZeroSSL certificates out of the box with zero external tools or cron jobs required.
+
+Create `/etc/caddy/Caddyfile`:
+
+```caddy
+api.example.com {
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+Start Caddy:
+
+```bash
+sudo systemctl enable --now caddy
+```
+
+---
+
 ### Nginx Configuration
 
 ```nginx
