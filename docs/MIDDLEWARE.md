@@ -8,23 +8,24 @@ A comprehensive, production-ready guide to understanding, writing, composing, an
 
 1. [What is Middleware?](#what-is-middleware)
 2. [The Request Lifecycle and the Onion Model](#the-request-lifecycle-and-the-onion-model)
-3. [The Four Tiers of Middleware in Nitrox](#the-four-tiers-of-middleware-in-nitrox)
+3. [The Simple Middleware Signature](#the-simple-middleware-signature)
+4. [The Four Tiers of Middleware in Nitrox](#the-four-tiers-of-middleware-in-nitrox)
    - [Tier 1: Global / Application-Level](#tier-1-global--application-level)
    - [Tier 2: Router-Level](#tier-2-router-level)
    - [Tier 3: Route-Level](#tier-3-route-level)
    - [Tier 4: Fluent RouteBuilder](#tier-4-fluent-routebuilder)
-4. [Passing Multiple Middlewares (Tuples & Vectors)](#passing-multiple-middlewares-tuples--vectors)
-5. [Understanding `Next` and Short-Circuiting](#understanding-next-and-short-circuiting)
-6. [Building Real-World Custom Middlewares](#building-real-world-custom-middlewares)
-   - [1. Authentication & JWT Extraction](#1-authentication--jwt-extraction)
-   - [2. Role-Based Authorization](#2-role-based-authorization)
-   - [3. Request Latency & Performance Headers](#3-request-latency--performance-headers)
-   - [4. Redis Token Bucket Rate Limiter](#4-redis-token-bucket-rate-limiter)
-   - [5. API Key & Security Header Validation](#5-api-key--security-header-validation)
-   - [6. Accessing Application State in Middleware](#6-accessing-application-state-in-middleware)
-7. [When to Use Which Pattern (Decision Matrix)](#when-to-use-which-pattern-decision-matrix)
-8. [Express.js vs Nitrox: Side-by-Side Comparison](#expressjs-vs-nitrox-side-by-side-comparison)
-9. [Under the Hood: Zero-Cost Boot-Time Pre-Composition](#under-the-hood-zero-cost-boot-time-pre-composition)
+5. [Passing Multiple Middlewares (Tuples & Vectors)](#passing-multiple-middlewares-tuples--vectors)
+6. [Understanding `Next` and Short-Circuiting](#understanding-next-and-short-circuiting)
+7. [Building Real-World Custom Middlewares](#building-real-world-custom-middlewares)
+   - [1. Simple Async Function Middleware](#1-simple-async-function-middleware)
+   - [2. Authentication Guard with State](#2-authentication-guard-with-state)
+   - [3. Role-Based Authorization](#3-role-based-authorization)
+   - [4. Execution Timing & Latency Headers](#4-execution-timing--latency-headers)
+   - [5. Redis Token Bucket Rate Limiting](#5-redis-token-bucket-rate-limiting)
+   - [6. Request Header & Content-Type Validation](#6-request-header--content-type-validation)
+8. [When to Use Which Pattern (Decision Matrix)](#when-to-use-which-pattern-decision-matrix)
+9. [Express.js vs Nitrox: Side-by-Side Comparison](#expressjs-vs-nitrox-side-by-side-comparison)
+10. [Under the Hood: Zero-Cost Boot-Time Pre-Composition](#under-the-hood-zero-cost-boot-time-pre-composition)
 
 ---
 
@@ -34,46 +35,36 @@ In Nitrox, a **middleware** is an asynchronous function that sits directly in th
 
 1. **Inspect and validate** incoming requests (headers, query params, authentication tokens).
 2. **Short-circuit** the pipeline early (e.g., returning `401 Unauthorized` or `429 Too Many Requests` without executing downstream code).
-3. **Enrich and transform** the response (adding security headers, `X-Response-Time`, compression).
+3. **Enrich and transform** the response (adding security headers, `X-Response-Time`, cookies).
 4. **Wrap execution** with telemetry, logging, and performance metrics.
-
-Every middleware function in Nitrox has the following signature:
-
-```rust
-Fn(Request<S>, Response, Next<S>) -> Future<Output = NitroxResult<Response>>
-```
-
-- `req`: The incoming [`Request<S>`](file:///c:/Users/somen/myProjects/rustyx/src/request.rs) containing headers, method, path, state, and body readers.
-- `res`: The outgoing [`Response`](file:///c:/Users/somen/myProjects/rustyx/src/response.rs) builder.
-- `next`: The continuation closure [`Next<S>`](file:///c:/Users/somen/myProjects/rustyx/src/middleware.rs). Calling `next(req, res).await` passes control to the next middleware or the route handler.
 
 ---
 
 ## The Request Lifecycle and the Onion Model
 
-Nitrox uses the classic **Onion Architecture** (similar to Koa, Express, and Axum layers). Middlewares execute in nested layers:
+Nitrox uses the classic **Onion Architecture** (familiar from Express and Koa). Middlewares execute in nested layers:
 
 ```text
 Incoming Request
       │
       ▼
 ┌────────────────────────────────────────────────────────┐
-│ Global Middleware 1 (e.g. Request ID & Logger Enter)   │
+│ Global Middleware (e.g. Request ID & Logger Enter)     │
 │   ┌──────────────────────────────────────────────────┐ │
-│   │ Router Middleware 1 (e.g. Session / Token Enter) │ │
+│   │ Router Middleware (e.g. Session / Token Enter)   │ │
 │   │   ┌────────────────────────────────────────────┐ │ │
-│   │   │ Route Middleware 1 (e.g. Require Role Enter)│ │
+│   │   │ Route Middleware (e.g. Require Auth Enter) │ │ │
 │   │   │   ┌──────────────────────────────────────┐ │ │ │
 │   │   │   │                                      │ │ │ │
 │   │   │   │        Terminal Route Handler        │ │ │ │
 │   │   │   │     (Generates HTTP 200 Response)    │ │ │ │
 │   │   │   │                                      │ │ │ │
 │   │   │   └──────────────────────────────────────┘ │ │ │
-│   │   │ Route Middleware 1 Exit (Unwinds)          │ │ │
+│   │   │ Route Middleware Exit (Unwinds)            │ │ │
 │   │   └────────────────────────────────────────────┘ │ │
-│   │ Router Middleware 1 Exit (Unwinds)               │ │
+│   │ Router Middleware Exit (Unwinds)                 │ │
 │   └──────────────────────────────────────────────────┘ │
-│ Global Middleware 1 Exit (Logs Duration & Status)      │
+│ Global Middleware Exit (Logs Duration & Status)        │
 └────────────────────────────────────────────────────────┘
       │
       ▼
@@ -83,7 +74,43 @@ Outgoing Response to Client
 ### Execution Flow Rules
 1. **Entering:** Middlewares run in the exact order they are registered (FIFO: First In, First Out).
 2. **Terminal Handler:** Once all middlewares have called `next(req, res).await`, the terminal route handler executes.
-3. **Exiting (Unwinding):** As the future resolves, control flows backward through each middleware in reverse order (LIFO: Last In, First Out). This allows outer middlewares to inspect the final response status or add timing headers.
+3. **Exiting (Unwinding):** As the future resolves, control flows backward through each middleware in reverse order (LIFO: Last In, First Out). Outer middlewares can inspect the final response status or add timing headers.
+
+---
+
+## The Simple Middleware Signature
+
+Writing a middleware in Nitrox requires no complex traits, macros, or pinned heap boxes. It is just a standard asynchronous Rust function:
+
+```rust
+pub async fn my_middleware(
+    req: Request<AppState>,
+    res: Response,
+    next: Next<AppState>,
+) -> Response {
+    // 1. Code before next() runs on the way IN
+    println!("Incoming request: {}", req.path());
+
+    // 2. Call next middleware or terminal handler
+    let response = next(req, res).await;
+
+    // 3. Code after next() runs on the way OUT
+    println!("Response status: {}", response.get_status());
+    response
+}
+```
+
+Or an inline closure:
+```rust
+app.use_middleware(|req, res, next| async move {
+    let response = next(req, res).await;
+    response
+});
+```
+
+- `req`: The incoming [`Request<S>`](file:///c:/Users/somen/myProjects/rustyx/src/request.rs). Provides zero-clone access to your state via `req.state.my_field`.
+- `res`: The outgoing [`Response`](file:///c:/Users/somen/myProjects/rustyx/src/response.rs) builder.
+- `next`: The continuation function [`Next<S>`](file:///c:/Users/somen/myProjects/rustyx/src/middleware.rs). Awaiting `next(req, res).await` returns the final `Response`.
 
 ---
 
@@ -93,7 +120,7 @@ Nitrox provides four distinct tiers for attaching middleware, from whole-applica
 
 ### Tier 1: Global / Application-Level
 
-Applied to **every single route** across the entire web application, including static file endpoints.
+Applied to **every single route** across the entire web application.
 
 ```rust
 use nitrox::prelude::*;
@@ -114,12 +141,12 @@ app.use_middleware(helmet());
 Applied to all routes grouped inside a specific [`Router<S>`](file:///c:/Users/somen/myProjects/rustyx/src/router.rs). Useful for prefix-mounted sub-modules (e.g., `/api/v1`, `/admin`, `/auth`).
 
 ```rust
-let mut admin_router = Router::new();
+let mut admin_router = Router::with_state();
 
-// Express-style: runs for every endpoint registered on admin_router
+// Runs for every endpoint registered on admin_router
 admin_router.use_middleware(|req, res, next| async move {
     if req.header("x-admin-key") != Some("super-secret") {
-        return res.status(403).json(serde_json::json!({
+        return res.status(403).json(json!({
             "error": "Forbidden: Admin key required"
         }));
     }
@@ -128,7 +155,7 @@ admin_router.use_middleware(|req, res, next| async move {
 
 // Alias: admin_router.r#use(mw) also works!
 admin_router.get("/metrics", |req, res| async move {
-    res.json(serde_json::json!({"active_nodes": 4}))
+    res.json(json!({"active_nodes": 4}))
 });
 
 // Mount admin_router with prefix "/admin"
@@ -156,8 +183,6 @@ Applied exclusively to a single endpoint. Nitrox provides dedicated `_with` verb
 - `delete_with`
 - `patch_with`
 
-Both `app` and `router` support these methods:
-
 ```rust
 // Only /dashboard requires authentication; / remains completely public
 app.get("/", |_req, res| async move {
@@ -165,7 +190,7 @@ app.get("/", |_req, res| async move {
 });
 
 app.get_with("/dashboard", require_auth, |req, res| async move {
-    res.json(serde_json::json!({"secret": "user profile data"}))
+    res.json(json!({"secret": "user profile data"}))
 });
 ```
 
@@ -178,12 +203,11 @@ When configuring multiple HTTP verbs or multiple middlewares on the same URI pat
 ```rust
 router.route("/items")
     .use_middleware(require_auth)
-    .use_middleware(audit_log)
     .get(|_req, res| async move {
-        res.json(serde_json::json!({"items": ["a", "b"]}))
+        res.json(json!({"items": ["a", "b"]}))
     })
     .post(|req, res| async move {
-        res.status(201).json(serde_json::json!({"created": true}))
+        res.status(201).json(json!({"created": true}))
     });
 ```
 
@@ -192,20 +216,20 @@ router.route("/items")
 ## Passing Multiple Middlewares (Tuples & Vectors)
 
 Nitrox implements the [`IntoMiddlewareChain<S>`](file:///c:/Users/somen/myProjects/rustyx/src/middleware.rs) trait for:
-1. A single middleware closure or function pointer.
-2. Tuples of up to 8 middlewares: `(mw1, mw2)`, `(mw1, mw2, mw3, ...)`.
-3. Vectors of middleware: `Vec<MiddlewareFn<S>>`.
+1. A single middleware function: `mw`
+2. Tuples of up to 8 middlewares: `(mw1, mw2)`, `(mw1, mw2, mw3)`, etc.
+3. Vectors of middleware: `Vec<MiddlewareFn<S>>`
 
 ### Example with Tuples:
 ```rust
-async fn auth_mw<S: Send + Sync + 'static>(req: Request<S>, res: Response, next: Next<S>) -> NitroxResult<Response> {
+async fn auth_mw(req: Request<AppState>, res: Response, next: Next<AppState>) -> Response {
     if req.bearer_token().is_none() {
         return res.status(401).send("Unauthorized");
     }
     next(req, res).await
 }
 
-async fn admin_mw<S: Send + Sync + 'static>(req: Request<S>, res: Response, next: Next<S>) -> NitroxResult<Response> {
+async fn admin_mw(req: Request<AppState>, res: Response, next: Next<AppState>) -> Response {
     if req.header("x-role") != Some("admin") {
         return res.status(403).send("Requires Admin Role");
     }
@@ -214,7 +238,7 @@ async fn admin_mw<S: Send + Sync + 'static>(req: Request<S>, res: Response, next
 
 // Pass a 2-tuple: executes auth_mw FIRST, then admin_mw SECOND
 router.get_with("/admin/settings", (auth_mw, admin_mw), |req, res| async move {
-    res.json(serde_json::json!({"maintenance_mode": false}))
+    res.json(json!({"maintenance_mode": false}))
 });
 ```
 
@@ -222,20 +246,24 @@ router.get_with("/admin/settings", (auth_mw, admin_mw), |req, res| async move {
 
 ## Understanding `Next` and Short-Circuiting
 
-The `next` parameter is not a callback; it is an asynchronous callable that represents the rest of the pipeline:
+The `next` parameter is an asynchronous callable that invokes downstream middlewares and the terminal handler:
 
 ```rust
-let response = next(req, res).await?;
+let response = next(req, res).await;
 ```
 
 ### The Power of Short-Circuiting
-To halt request processing immediately, **do not call `next`**. Simply return your own [`Response`](file:///c:/Users/somen/myProjects/rustyx/src/response.rs):
+To halt request processing immediately (e.g. invalid auth, banned IP, rate limit exceeded), **do not call `next`**. Simply return your own [`Response`](file:///c:/Users/somen/myProjects/rustyx/src/response.rs):
 
 ```rust
-|req, res, next| async move {
+pub async fn require_auth(
+    req: Request<AppState>,
+    res: Response,
+    next: Next<AppState>,
+) -> Response {
     if req.bearer_token().is_none() {
         // Downstream middlewares and route handlers will NEVER run!
-        return res.status(401).json(serde_json::json!({
+        return res.status(401).json(json!({
             "error": "Unauthorized",
             "message": "Bearer token missing"
         }));
@@ -250,102 +278,134 @@ To halt request processing immediately, **do not call `next`**. Simply return yo
 
 ## Building Real-World Custom Middlewares
 
-### 1. Authentication & JWT Extraction
+### 1. Simple Async Function Middleware
+
+A clean logging and timing middleware:
 
 ```rust
 use nitrox::prelude::*;
 
-pub async fn require_jwt<S: Send + Sync + 'static>(
+pub async fn request_logger<S: Send + Sync + 'static>(
     req: Request<S>,
     res: Response,
     next: Next<S>,
-) -> NitroxResult<Response> {
-    let token = match req.bearer_token() {
-        Some(t) => t,
-        None => {
-            return res.status(401).json(serde_json::json!({
-                "status": "fail",
-                "message": "Authorization header missing or not Bearer format"
-            }));
-        }
-    };
+) -> Response {
+    let start = std::time::Instant::now();
+    let method = req.method().to_string();
+    let path = req.path().to_string();
 
-    // Replace with jsonwebtoken or your validation logic
-    if token != "valid-jwt-token" {
-        return res.status(401).json(serde_json::json!({
-            "status": "fail",
-            "message": "Token expired or invalid"
-        }));
-    }
+    let response = next(req, res).await;
 
-    next(req, res).await
+    let elapsed = start.elapsed();
+    println!("[{}] {} -> completed in {:.2}ms", method, path, elapsed.as_secs_f64() * 1000.0);
+    response
 }
 ```
 
 ---
 
-### 2. Role-Based Authorization
+### 2. Authentication Guard with State
 
-Creating reusable middleware factories with arguments:
+Directly inspect your database or JWT service through `req.state`:
 
 ```rust
 use nitrox::prelude::*;
 
-pub fn require_role<S: Send + Sync + 'static>(expected_role: &'static str) -> impl Fn(Request<S>, Response, Next<S>) -> std::pin::Pin<Box<dyn std::future::Future<Output = NitroxResult<Response>> + Send>> + Send + Sync + 'static {
-    move |req, res, next| {
-        Box::pin(async move {
-            match req.header("x-user-role") {
-                Some(role) if role == expected_role => next(req, res).await,
-                Some(_) => res.status(403).json(serde_json::json!({
-                    "error": "Forbidden: Insufficient privileges"
-                })),
-                None => res.status(401).json(serde_json::json!({
-                    "error": "Unauthorized: Role header missing"
-                })),
-            }
-        })
-    }
+pub struct AppState {
+    pub jwt_secret: String,
 }
 
-// Usage:
-router.get_with("/admin/users", require_role("superadmin"), |req, res| async move {
-    res.send("Superadmin User List")
+pub async fn require_auth(
+    req: Request<AppState>,
+    res: Response,
+    next: Next<AppState>,
+) -> Response {
+    let auth_header = req.header("authorization");
+
+    match auth_header {
+        Some(val) if val.starts_with("Bearer ") => {
+            let token = &val[7..];
+
+            // Validate against secret stored in state:
+            if token == req.state.jwt_secret {
+                next(req, res).await
+            } else {
+                res.status(401).json(json!({
+                    "error": "Unauthorized: Invalid or expired token"
+                }))
+            }
+        }
+        _ => res.status(401).json(json!({
+            "error": "Unauthorized: Missing Bearer token"
+        })),
+    }
+}
+```
+
+---
+
+### 3. Role-Based Authorization
+
+Use inline closures directly on routes, or write clean helper functions:
+
+```rust
+use nitrox::prelude::*;
+
+// Approach A: Inline closure directly on the route (most ergonomic!)
+router.get_with("/admin/dashboard", |req: Request<AppState>, res, next| async move {
+    if req.header("x-role") != Some("admin") {
+        return res.status(403).json(json!({"error": "Admin access required"}));
+    }
+    next(req, res).await
+}, |req, res| async move {
+    res.send("Admin Dashboard")
+});
+
+// Approach B: Reusable named async function
+pub async fn require_admin_role(
+    req: Request<AppState>,
+    res: Response,
+    next: Next<AppState>,
+) -> Response {
+    if req.header("x-role") != Some("admin") {
+        return res.status(403).json(json!({"error": "Admin access required"}));
+    }
+    next(req, res).await
+}
+
+router.get_with("/admin/users", require_admin_role, |req, res| async move {
+    res.json(json!({"users": []}))
 });
 ```
 
 ---
 
-### 3. Request Latency & Performance Headers
+### 4. Execution Timing & Latency Headers
+
+Measure handler latency and inject standard telemetry headers on the outgoing response:
 
 ```rust
-use std::time::Instant;
 use nitrox::prelude::*;
+use std::time::Instant;
 
-pub fn latency_tracker<S: Send + Sync + 'static>() -> impl Fn(Request<S>, Response, Next<S>) -> std::pin::Pin<Box<dyn std::future::Future<Output = NitroxResult<Response>> + Send>> + Send + Sync + 'static {
-    |req, res, next| {
-        Box::pin(async move {
-            let start = Instant::now();
-            let path = req.path().to_string();
-            let method = req.method().to_string();
+pub async fn add_response_time<S: Send + Sync + 'static>(
+    req: Request<S>,
+    res: Response,
+    next: Next<S>,
+) -> Response {
+    let start = Instant::now();
+    let response = next(req, res).await;
+    let duration = start.elapsed();
 
-            // Downstream execution:
-            let response = next(req, res).await?;
-
-            let duration = start.elapsed();
-            println!("[{}] {} -> completed in {:.3}ms", method, path, duration.as_secs_f64() * 1000.0);
-
-            // Add benchmark header to client response
-            Ok(response.header("X-Response-Time", &format!("{:.2}ms", duration.as_secs_f64() * 1000.0)))
-        })
-    }
+    response.header("X-Response-Time", &format!("{:.2}ms", duration.as_secs_f64() * 1000.0))
 }
 ```
 
 ---
 
-### 4. Redis Token Bucket Rate Limiter
+### 5. Redis Token Bucket Rate Limiting
 
-Using Nitrox shared state to query a Redis connection pool inside middleware:
+Access a Redis connection pool directly from `req.state`:
 
 ```rust
 use nitrox::prelude::*;
@@ -358,7 +418,7 @@ pub async fn redis_rate_limit(
     req: Request<AppState>,
     res: Response,
     next: Next<AppState>,
-) -> NitroxResult<Response> {
+) -> Response {
     let client_ip = req.header("x-forwarded-for").unwrap_or("127.0.0.1");
     let key = format!("ratelimit:{}", client_ip);
 
@@ -381,7 +441,7 @@ pub async fn redis_rate_limit(
     }
 
     if count > 100 {
-        return res.status(429).json(serde_json::json!({
+        return res.status(429).json(json!({
             "error": "Too Many Requests",
             "message": "Rate limit exceeded. Try again in 60 seconds."
         }));
@@ -393,59 +453,29 @@ pub async fn redis_rate_limit(
 
 ---
 
-### 5. API Key & Security Header Validation
+### 6. Request Header & Content-Type Validation
+
+Ensure client requests send proper headers before executing business logic:
 
 ```rust
 use nitrox::prelude::*;
 
-pub async fn require_json_content_type<S: Send + Sync + 'static>(
+pub async fn require_json_body<S: Send + Sync + 'static>(
     req: Request<S>,
     res: Response,
     next: Next<S>,
-) -> NitroxResult<Response> {
+) -> Response {
     if matches!(req.method(), &hyper::Method::POST | &hyper::Method::PUT | &hyper::Method::PATCH) {
         let is_json = req.content_type()
             .map(|ct| ct.contains("application/json"))
             .unwrap_or(false);
 
         if !is_json {
-            return res.status(415).json(serde_json::json!({
+            return res.status(415).json(json!({
                 "error": "Unsupported Media Type",
                 "message": "Content-Type must be application/json"
             }));
         }
-    }
-
-    next(req, res).await
-}
-```
-
----
-
-### 6. Accessing Application State in Middleware
-
-Because [`Request<S>`](file:///c:/Users/somen/myProjects/rustyx/src/request.rs) carries your generic state `S`, middleware has zero-overhead access to database pools, caches, and configuration:
-
-```rust
-pub struct DatabaseState {
-    pub db: sqlx::PgPool,
-}
-
-pub async fn tenant_verifier(
-    req: Request<DatabaseState>,
-    res: Response,
-    next: Next<DatabaseState>,
-) -> NitroxResult<Response> {
-    let tenant_id = req.header("x-tenant-id").unwrap_or("default");
-
-    // Direct access to state.db with zero manual locking:
-    let exists = sqlx::query!("SELECT id FROM tenants WHERE id = $1", tenant_id)
-        .fetch_optional(&req.state.db)
-        .await
-        .map_err(|e| NitroxError::Internal(e.to_string()))?;
-
-    if exists.is_none() {
-        return res.status(404).send("Tenant Not Found");
     }
 
     next(req, res).await
@@ -459,7 +489,7 @@ pub async fn tenant_verifier(
 | Use Case | Recommended Pattern | Example |
 |---|---|---|
 | Request Logging, Global CORS, Helmet Security Headers | **Tier 1: Global (`app.use_middleware`)** | `app.use_middleware(logger())` |
-| Route Prefix Protection (`/api/v1/*`, `/admin/*`) | **Tier 2: Router-Level (`router.use_middleware`)** | `admin.use_middleware(admin_guard)` |
+| Route Prefix Protection (`/api/v1/*`, `/admin/*`) | **Tier 2: Router-Level (`router.use_middleware`)** | `admin.use_middleware(auth_guard)` |
 | Protecting a single endpoint (`GET /me`, `POST /checkout`) | **Tier 3: Route-Level (`get_with`, `post_with`)** | `r.get_with("/me", auth, handler)` |
 | Sequential checks on one route (Auth + Role + Audit) | **Tier 3: Route-Level Tuple** | `r.get_with("/p", (auth, role), handler)` |
 | Multiple HTTP verbs on the same URI with shared middleware | **Tier 4: RouteBuilder (`r.route(path)`)** | `r.route("/cart").use_middleware(auth).get(...).post(...)` |
@@ -467,8 +497,6 @@ pub async fn tenant_verifier(
 ---
 
 ## Express.js vs Nitrox: Side-by-Side Comparison
-
-If you know Express.js, here is the exact Rosetta Stone:
 
 | Pattern | Express.js (Node.js) | Nitrox (Rust) |
 |---|---|---|

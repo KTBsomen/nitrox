@@ -27,7 +27,7 @@ impl Nitrox<()> {
     pub fn new() -> Self;
 }
 
-impl<S: Clone + Send + Sync + 'static> Nitrox<S> {
+impl<S: Send + Sync + 'static> Nitrox<S> {
     pub fn with_state(state: S) -> Self;
     pub fn use_middleware<F, Fut>(&self, middleware: F) -> &Self;
     pub fn use_router(&self, path: &str, router: Router<S>) -> &Self;
@@ -165,8 +165,8 @@ When parsing untyped JSON (`serde_json::Value`):
 
 ### Gotcha B: Database Connection Pools and the Mutex Trap
 - Connection pools (`sqlx::PgPool`, `mongodb::Database`, `redis::aio::ConnectionManager`) are ALREADY thread-safe smart pointers internally.
-- **NEVER** wrap them in a `Mutex` (e.g. `Arc<Mutex<PgPool>>`). Doing so forces the server to process all database queries serially, destroying concurrency.
-- Store them directly in your `AppState` struct with `#[derive(Clone)]`.
+- **NEVER** wrap them in an outer `Mutex` (e.g. `Arc<Mutex<PgPool>>`). Doing so forces the server to process all database queries serially, destroying concurrency.
+- Store them directly in your `AppState` struct. Nitrox wraps `state` in an internal `Arc<S>` automatically, so `AppState` does NOT need manual `Arc` wrapping or `#[derive(Clone)]`.
 
 ### Gotcha C: Danger of `.unwrap()` in Production Handlers
 - If a header, query param, or JSON field is missing, `.unwrap()` panics and crashes the worker task.
@@ -182,6 +182,10 @@ let Some(token) = req.bearer_token() else {
 };
 ```
 
+### Gotcha E: Zero Closure-Cloning with `with_state`
+- DO NOT manually write `let db_clone = db.clone()` before routes or double-closures.
+- Always initialize your app with `Nitrox::with_state(state)` and access `req.state.my_field` directly in any route or middleware.
+
 ---
 
 ## 5. Production Reference Template
@@ -190,7 +194,7 @@ let Some(token) = req.bearer_token() else {
 use nitrox::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+// Plain struct: NO Arc wrapping, NO #[derive(Clone)] needed!
 pub struct AppState {
     pub db_pool: sqlx::PgPool,
     pub redis: redis::aio::ConnectionManager,
@@ -206,7 +210,7 @@ pub async fn require_auth(
     req: Request<AppState>,
     res: Response,
     next: Next<AppState>,
-) -> NitroxResult<Response> {
+) -> Response {
     let Some(token) = req.bearer_token() else {
         return res.status(401).json(serde_json::json!({
             "error": "Unauthorized: Bearer token required"

@@ -622,5 +622,7 @@ Configure Nginx upstream to load balance.
 
 ## Next Steps
 
-- [API Reference](./API.md)
-- [Troubleshooting Guide](./TROUBLESHOOTING.md)
+- [Beginner's Guide & Express Migration](./BEGINNER_GUIDE.md)
+- [Application State & Databases](./STATE.md)
+- [Installation Guide](./INSTALLATION.md)
+- [Middleware Master Guide](./MIDDLEWARE.md)

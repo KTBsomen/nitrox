@@ -26,6 +26,7 @@ Whether you are an experienced Rustacean or a JavaScript/TypeScript developer wr
 | Guide | Description |
 |---|---|
 | [**Beginner's Guide & Express Migration**](BEGINNER_GUIDE.md) | **Start here!** Complete tutorial, Express-to-Rust conversion, every function explained, and 7 critical Rust gotchas. |
+| [**Installation & Setup Guide**](INSTALLATION.md) | How to add Nitrox and integrate external database pools (SQLx, MongoDB, Redis). |
 | [**Middleware Master Guide**](MIDDLEWARE.md) | Exhaustive guide to Global, Router-level, Route-level, and Fluent RouteBuilder middleware with FIFO order and short-circuiting. |
 | [**Application State & Databases**](STATE.md) | How to safely share state (PostgreSQL, MongoDB, Redis) without mutex deadlocks or runtime cloning. |
 | [**Quick Start Guide**](QUICKSTART.md) | Build a working REST API with Nitrox in under 5 minutes. |

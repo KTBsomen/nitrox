@@ -133,12 +133,13 @@ app.post("/users", |req, res| async move {
 
 ---
 
-## CRUD Example
+## Zero-Clone Application State CRUD Example
+
+Nitrox eliminates the traditional Rust closure-cloning nightmare. Using `Nitrox::with_state(state)`, your state is automatically wrapped in an internal atomic reference and directly available on `req.state` with **zero manual Arc wrapping and zero closure cloning**:
 
 ```rust
 use nitrox::prelude::*;
 use std::collections::HashMap;
-use std::sync::Arc;
 use parking_lot::RwLock;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,87 +149,57 @@ struct Todo {
     completed: bool,
 }
 
-type Db = Arc<RwLock<HashMap<String, Todo>>>;
+// 1. Define your application state struct (No Arc wrapper needed!)
+struct AppState {
+    todos: RwLock<HashMap<String, Todo>>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let db: Db = Arc::new(RwLock::new(HashMap::new()));
-    let app = Nitrox::new();
+    let state = AppState {
+        todos: RwLock::new(HashMap::new()),
+    };
 
-    // List all todos
-    let db_clone = db.clone();
-    app.get("/todos", move |_req, res| {
-        let db = db_clone.clone();
-        async move {
-            let todos: Vec<Todo> = db.read().values().cloned().collect();
-            res.json(json!({ "todos": todos }))
-        }
+    // 2. Pass state directly to Nitrox - Nitrox handles Arc internally!
+    let app = Nitrox::with_state(state);
+
+    // List all todos - direct access via req.state!
+    app.get("/todos", |req, res| async move {
+        let todos: Vec<Todo> = req.state.todos.read().values().cloned().collect();
+        res.json(json!({ "todos": todos }))
     });
 
     // Get single todo
-    let db_clone = db.clone();
-    app.get("/todos/:id", move |req, res| {
-        let db = db_clone.clone();
-        async move {
-            let id = req.param("id").unwrap();
-            match db.read().get(id) {
-                Some(todo) => res.json(todo),
-                None => res.not_found(),
-            }
+    app.get("/todos/:id", |req, res| async move {
+        let id = req.param("id").unwrap_or_default();
+        let lock = req.state.todos.read();
+        match lock.get(id) {
+            Some(todo) => res.json(todo),
+            None => res.not_found(),
         }
     });
 
     // Create todo
-    let db_clone = db.clone();
-    app.post("/todos", move |req, res| {
-        let db = db_clone.clone();
-        async move {
-            #[derive(Deserialize)]
-            struct CreateTodo { title: String }
-            
-            match req.json::<CreateTodo>() {
-                Ok(data) => {
-                    let todo = Todo {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        title: data.title,
-                        completed: false,
-                    };
-                    db.write().insert(todo.id.clone(), todo.clone());
-                    res.created(todo)
-                }
-                Err(e) => res.bad_request(&e.to_string()),
-            }
-        }
-    });
-
-    // Update todo
-    let db_clone = db.clone();
-    app.put("/todos/:id", move |req, res| {
-        let db = db_clone.clone();
-        async move {
-            let id = req.param("id").unwrap().clone();
-            
-            match req.json::<Todo>() {
-                Ok(mut todo) => {
-                    todo.id = id.clone();
-                    db.write().insert(id, todo.clone());
-                    res.json(todo)
-                }
-                Err(e) => res.bad_request(&e.to_string()),
-            }
-        }
+    app.post("/todos", |mut req, res| async move {
+        #[derive(Deserialize)]
+        struct CreateTodo { title: String }
+        
+        let data: CreateTodo = req.json().await?;
+        let todo = Todo {
+            id: uuid::Uuid::new_v4().to_string(),
+            title: data.title,
+            completed: false,
+        };
+        req.state.todos.write().insert(todo.id.clone(), todo.clone());
+        res.status(201).json(todo)
     });
 
     // Delete todo
-    let db_clone = db.clone();
-    app.delete("/todos/:id", move |req, res| {
-        let db = db_clone.clone();
-        async move {
-            let id = req.param("id").unwrap();
-            match db.write().remove(id) {
-                Some(_) => res.no_content(),
-                None => res.not_found(),
-            }
+    app.delete("/todos/:id", |req, res| async move {
+        let id = req.param("id").unwrap_or_default();
+        match req.state.todos.write().remove(id) {
+            Some(_) => res.no_content(),
+            None => res.not_found(),
         }
     });
 
@@ -348,7 +319,8 @@ async fn main() -> Result<()> {
 
 ## Next Steps
 
-- [Middleware Guide](./MIDDLEWARE.md) - Learn about built-in and custom middleware
-- [Database Guide](./DATABASE.md) - Connect to databases
-- [API Reference](./API.md) - Complete API documentation
+- [Beginner's Guide & Express Migration](./BEGINNER_GUIDE.md) - Complete tutorial and Rust gotchas
+- [Application State & Databases](./STATE.md) - Deep dive into state patterns and avoiding lock contention
+- [Middleware Master Guide](./MIDDLEWARE.md) - 4-tier middleware lifecycle and recipes
+- [Multipart File Uploads](./UPLOAD.md) - Multer-style file streaming
 - [Deployment Guide](./DEPLOYMENT.md) - Deploy your application

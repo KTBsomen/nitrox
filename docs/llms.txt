@@ -9,9 +9,11 @@ This file provides machine-readable context, architectural rules, and code gener
 When generating Rust code that uses Nitrox, ALWAYS adhere to the following rules:
 
 ### 1. Application State & Databases
-- Access state via `req.state` (or `req.state()`). DO NOT generate manual double-clones (`let db = db.clone()`) around route closures.
-- App state must implement `Clone + Send + Sync + 'static`.
-- NEVER wrap database connection pools (`sqlx::PgPool`, `mongodb::Client`, `mongodb::Database`, `redis::aio::ConnectionManager`) in a `Mutex`. These types are ALREADY thread-safe smart pointers with internal pooling. Wrapping them in a `Mutex` serializes requests and destroys concurrency.
+- Always initialize state using `Nitrox::with_state(state)`. The developer passes their struct directly WITHOUT wrapping it in `Arc::new(state)`. Nitrox automatically wraps state in an `Arc<S>` internally.
+- The state type `S` only requires `Send + Sync + 'static` (it does NOT need `Clone`).
+- In any route handler or middleware, access state directly via `req.state.my_field`. NEVER generate manual double-clones (`let db_clone = db.clone()`) or outer closure captures.
+- For modular sub-routers, create with `Router::with_state()` and mount using `app.mount("/prefix", router)` (or `app.use_router`).
+- NEVER wrap database connection pools (`sqlx::PgPool`, `mongodb::Client`, `mongodb::Database`, `redis::aio::ConnectionManager`) in an outer `Mutex`. These types are ALREADY thread-safe connection managers with internal pooling. Wrapping them in a `Mutex` serializes all requests and destroys concurrency.
 
 ### 2. Route-Level & Router-Level Middlewares
 - For router-level middleware, call `router.use_middleware(mw)` or `router.r#use(mw)`. Multiple calls execute in strict FIFO order.

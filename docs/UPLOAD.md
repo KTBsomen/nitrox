@@ -446,6 +446,7 @@ let boundary = parse_boundary(content_type);
 
 ## Next Steps
 
-- [Middleware Guide](./MIDDLEWARE.md)
-- [API Reference](./API.md)
+- [Beginner's Guide & Express Migration](./BEGINNER_GUIDE.md)
+- [Middleware Master Guide](./MIDDLEWARE.md)
+- [Application State & Databases](./STATE.md)
 - [Deployment Guide](./DEPLOYMENT.md)
