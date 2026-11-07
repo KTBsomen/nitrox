@@ -385,3 +385,114 @@ pub fn response_time<S: Send + Sync + 'static>(
         })
     }
 }
+
+// ============================================================================
+// Route-Level & Router-Level Middleware Composition
+// ============================================================================
+
+/// Trait for types that can be converted into an ordered sequence of middleware functions.
+///
+/// Enables passing a single middleware function, a tuple of multiple middlewares
+/// `(mw1, mw2, ...)`, or a `Vec<MiddlewareFn<S>>` directly into route definitions.
+pub trait IntoMiddlewareChain<S> {
+    /// Convert the type into a vector of boxed middleware functions maintaining strict execution order.
+    fn into_middleware_chain(self) -> Vec<MiddlewareFn<S>>;
+}
+
+impl<S, F, Fut> IntoMiddlewareChain<S> for F
+where
+    S: Send + Sync + 'static,
+    F: Fn(Request<S>, Response, Next<S>) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Response> + Send + 'static,
+{
+    fn into_middleware_chain(self) -> Vec<MiddlewareFn<S>> {
+        vec![Arc::new(move |req, res, next| Box::pin(self(req, res, next)))]
+    }
+}
+
+impl<S: Send + Sync + 'static> IntoMiddlewareChain<S> for MiddlewareFn<S> {
+    fn into_middleware_chain(self) -> Vec<MiddlewareFn<S>> {
+        vec![self]
+    }
+}
+
+impl<S: Send + Sync + 'static> IntoMiddlewareChain<S> for Vec<MiddlewareFn<S>> {
+    fn into_middleware_chain(self) -> Vec<MiddlewareFn<S>> {
+        self
+    }
+}
+
+macro_rules! impl_into_middleware_chain_tuple {
+    ($($idx:tt: $M:ident, $Fut:ident),+) => {
+        impl<S, $($M, $Fut),+> IntoMiddlewareChain<S> for ($($M),+)
+        where
+            S: Send + Sync + 'static,
+            $(
+                $M: Fn(Request<S>, Response, Next<S>) -> $Fut + Send + Sync + 'static,
+                $Fut: Future<Output = Response> + Send + 'static,
+            )+
+        {
+            fn into_middleware_chain(self) -> Vec<MiddlewareFn<S>> {
+                vec![
+                    $(
+                        Arc::new(move |req, res, next| Box::pin(self.$idx(req, res, next))),
+                    )+
+                ]
+            }
+        }
+    };
+}
+
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2);
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2, 2: M3, F3);
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2, 2: M3, F3, 3: M4, F4);
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2, 2: M3, F3, 3: M4, F4, 4: M5, F5);
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2, 2: M3, F3, 3: M4, F4, 4: M5, F5, 5: M6, F6);
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2, 2: M3, F3, 3: M4, F4, 4: M5, F5, 5: M6, F6, 6: M7, F7);
+impl_into_middleware_chain_tuple!(0: M1, F1, 1: M2, F2, 2: M3, F3, 3: M4, F4, 4: M5, F5, 5: M6, F6, 6: M7, F7, 7: M8, F8);
+
+/// Pre-composes an ordered list of middleware functions with a terminal route handler.
+///
+/// Execution runs in strict FIFO order: index 0 runs first, calls `next()` to run index 1,
+/// and continues through to the terminal handler.
+pub fn compose_middleware_chain<S: Send + Sync + 'static>(
+    middlewares: Vec<MiddlewareFn<S>>,
+    terminal: crate::app::HandlerFn<S>,
+) -> crate::app::HandlerFn<S> {
+    if middlewares.is_empty() {
+        return terminal;
+    }
+
+    let mws = Arc::new(middlewares);
+    Arc::new(move |req, res| {
+        let mws = Arc::clone(&mws);
+        let terminal = Arc::clone(&terminal);
+        Box::pin(run_chain(mws, 0, req, res, terminal))
+    })
+}
+
+fn run_chain<S: Send + Sync + 'static>(
+    middlewares: Arc<Vec<MiddlewareFn<S>>>,
+    index: usize,
+    req: Request<S>,
+    res: Response,
+    terminal: crate::app::HandlerFn<S>,
+) -> Pin<Box<dyn Future<Output = Response> + Send>> {
+    if index < middlewares.len() {
+        let mw = Arc::clone(&middlewares[index]);
+        let next_mws = Arc::clone(&middlewares);
+        let next_terminal = Arc::clone(&terminal);
+        let next: Next<S> = Arc::new(move |req, res| {
+            run_chain(
+                Arc::clone(&next_mws),
+                index + 1,
+                req,
+                res,
+                Arc::clone(&next_terminal),
+            )
+        });
+        mw(req, res, next)
+    } else {
+        terminal(req, res)
+    }
+}

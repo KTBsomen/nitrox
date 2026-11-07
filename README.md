@@ -13,11 +13,11 @@
 **A high-performance, minimalist web framework for Rust inspired by ExpressJS.**
 
 [Getting Started](#getting-started) •
-[Installation](#installation) •
-[State Management](#application-state-management) •
-[Core Concepts](#core-concepts) •
+[Beginner's Guide](docs/BEGINNER_GUIDE.md) •
+[Middleware Guide](docs/MIDDLEWARE.md) •
+[Documentation Portal](docs/index.html) •
+[AI Context (llms.txt)](docs/llms.txt) •
 [Benchmarks](#benchmarks) •
-[Deployment](#deployment) •
 [License](#license)
 
 </div>
@@ -386,23 +386,61 @@ app.get("/example", |_req, res| async move {
 
 ### Middleware
 
-Built-in and custom middleware execute in an ordered pipeline:
+Nitrox features a 4-tier middleware pipeline with **strict FIFO registration order**, zero runtime lock contention, and compile-time type verification.
 
-```rust
-// Standard middleware
-app.use_middleware(logger());
-app.use_middleware(cors("*"));
-app.use_middleware(helmet());
-app.use_middleware(timeout(15000)); // 15 second timeout
+#### The 4 Middleware Tiers
 
-// Custom middleware with access to state
-app.use_middleware(|req, res, next| async move {
-    let start = std::time::Instant::now();
-    let res = next(req, res).await;
-    let elapsed = start.elapsed();
-    res.header("X-Response-Time-Micros", &elapsed.as_micros().to_string())
-});
-```
+1. **Global / App-Level (`app.use_middleware`)**:
+   Runs across every route in the entire application.
+   ```rust
+   app.use_middleware(logger());
+   app.use_middleware(cors("*"));
+   app.use_middleware(helmet());
+   ```
+
+2. **Router-Level (`router.use_middleware` / `router.r#use`)**:
+   Runs for all routes attached to a sub-router. Calling it multiple times strictly maintains FIFO order:
+   ```rust
+   let mut api = Router::new();
+   api.use_middleware(request_logger)
+      .use_middleware(rate_limiter);
+   ```
+
+3. **Route-Level (`get_with`, `post_with`, etc.)**:
+   Applied directly to a specific route. Supports single functions or tuples of up to 8 middlewares:
+   ```rust
+   // Single middleware
+   api.get_with("/me", require_auth, |req, res| async move {
+       res.json(serde_json::json!({ "user": "admin" }))
+   });
+
+   // Multiple middlewares via tuple (executes auth first, then role check)
+   api.get_with("/admin", (require_auth, require_admin), |req, res| async move {
+       res.send("Admin Dashboard")
+   });
+   ```
+
+4. **Fluent RouteBuilder (`r.route(path)`)**:
+   Chain middlewares and multiple HTTP verbs cleanly on a single path:
+   ```rust
+   api.route("/orders")
+      .use_middleware(require_auth)
+      .get(|req, res| async move { res.send("Order list") })
+      .post(|req, res| async move { res.status(201).send("Created") });
+   ```
+
+#### Express.js vs Nitrox Middleware
+
+| Express.js | Nitrox (Rust) |
+|---|---|
+| `app.use(logger)` | `app.use_middleware(logger())` |
+| `router.use(auth)` | `router.use_middleware(auth)` *(or `router.r#use(auth)`)* |
+| `router.get('/me', auth, fn)` | `router.get_with("/me", auth, \|req, res\| async move { ... })` |
+| `router.get('/p', [a, b], fn)` | `router.get_with("/p", (a, b), \|req, res\| async move { ... })` |
+| `next()` *(callback)* | `next(req, res).await` *(async future)* |
+
+For the complete guide, custom auth/rate-limiting recipes, and lifecycle diagrams, see [**docs/MIDDLEWARE.md**](docs/MIDDLEWARE.md).
+For Express migration and beginner Rust gotchas, see [**docs/BEGINNER_GUIDE.md**](docs/BEGINNER_GUIDE.md).
 
 ---
 

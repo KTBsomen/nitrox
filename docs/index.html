@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nitrox - High-Performance Rust Web Framework</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="A high-performance, minimalist web framework for Rust inspired by ExpressJS">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  
+  <!-- Docsify Theme with Dark/Light Support -->
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css" id="theme">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify-darklight-theme@latest/dist/style.min.css" title="docsify-darklight-theme" type="text/css" />
+
+  <style>
+    :root {
+      --docsifytabs-border-color: #ededed;
+      --docsifytabs-tab-highlight-color: #3b82f6;
+    }
+    .sidebar {
+      padding-top: 20px;
+    }
+    .app-name-link {
+      font-weight: 800;
+      font-size: 1.5rem;
+      letter-spacing: -0.025em;
+      color: #3b82f6 !important;
+    }
+    .markdown-section pre > code {
+      font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, monospace;
+      font-size: 0.92rem;
+    }
+    .token.keyword {
+      font-weight: bold;
+    }
+    .ai-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: #e0e7ff;
+      color: #4338ca;
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">Loading Nitrox documentation...</div>
+  <script>
+    window.$docsify = {
+      name: 'Nitrox',
+      repo: 'https://github.com/rustyx/nitrox',
+      loadSidebar: true,
+      loadNavbar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: 'Search documentation...',
+        noData: 'No matching results found',
+        depth: 4
+      },
+      copyCode: {
+        buttonText: 'Copy to clipboard',
+        errorText: 'Error',
+        successText: 'Copied!'
+      },
+      pagination: {
+        previousText: 'Previous',
+        nextText: 'Next',
+        crossChapter: true,
+        crossChapterText: true
+      },
+      darklightTheme: {
+        siteFont: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        defaultTheme: 'light',
+        codeFontFamily: 'Fira Code, JetBrains Mono, monospace',
+        bodyFontSize: '16px',
+        dark: {
+          accent: '#60a5fa',
+          toogleBackground: '#ffffff',
+          background: '#0f172a',
+          textColor: '#e2e8f0',
+          codeTextColor: '#f8fafc',
+          codeBackgroundColor: '#1e293b',
+          borderColor: '#334155',
+          blockQuoteColor: '#94a3b8',
+          highlightColor: '#38bdf8'
+        },
+        light: {
+          accent: '#2563eb',
+          toogleBackground: '#0f172a',
+          background: '#ffffff',
+          textColor: '#1e293b',
+          codeTextColor: '#0f172a',
+          codeBackgroundColor: '#f8fafc',
+          borderColor: '#e2e8f0',
+          blockQuoteColor: '#64748b',
+          highlightColor: '#0284c7'
+        }
+      }
+    }
+  </script>
+  <!-- Docsify Core -->
+  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  
+  <!-- Plugins -->
+  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-darklight-theme@latest/dist/index.min.js"></script>
+  
+  <!-- Prism Syntax Highlighting -->
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-rust.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-toml.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+</body>
+</html>
+

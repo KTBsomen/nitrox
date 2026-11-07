@@ -17,8 +17,8 @@ pub fn router() -> Router<AppState> {
         AuthController::register(req, res).await
     });
 
-    // GET /me (Current User Profile)
-    r.get("/me", |req, res| async move {
+    // GET /me (Current User Profile - Protected by route-level require_auth)
+    r.get_with("/me", crate::middleware::require_auth, |req, res| async move {
         AuthController::me(req, res).await
     });
 

@@ -1,0 +1,253 @@
+# Nitrox: Complete AI Framework Manual & API Reference
+
+> Generated for LLMs, AI agents, and developers building high-performance web applications with Nitrox.
+
+---
+
+## 1. Executive Summary
+
+Nitrox is a minimalist, high-performance web framework for Rust inspired by the developer ergonomics of Express.js. It is built directly on Hyper 1.x and Tokio.
+
+Key architectural pillars:
+- **Zero-Clone State:** Inject shared state (DB pools, caches) into `Nitrox::with_state(state)` and access it anywhere via `req.state` with zero runtime locking and zero closure captures.
+- **Express-Style Router Modularization:** Mount sub-routers via `app.mount("/prefix", router)` or `app.use_router("/prefix", router)`.
+- **4-Tier Middleware Composition:** Global (`app.use_middleware`), Router-level (`router.use_middleware`), Route-level (`router.get_with`), and Fluent RouteBuilder (`router.route(path)`).
+- **Zero-Cost Boot-Time Pre-Composition:** Middlewares are composed into a unified `HandlerFn` during route registration at startup, avoiding runtime lock contention and dynamic allocations.
+- **Benchmark Performance:** Peak throughput of 130,000 to 186,000+ requests per second under high concurrency.
+
+---
+
+## 2. Complete API Specification
+
+### Application (`Nitrox<S>`)
+```rust
+pub struct Nitrox<S = ()>;
+
+impl Nitrox<()> {
+    pub fn new() -> Self;
+}
+
+impl<S: Clone + Send + Sync + 'static> Nitrox<S> {
+    pub fn with_state(state: S) -> Self;
+    pub fn use_middleware<F, Fut>(&self, middleware: F) -> &Self;
+    pub fn use_router(&self, path: &str, router: Router<S>) -> &Self;
+    pub fn mount(&self, path: &str, router: Router<S>) -> &Self; // Alias for use_router
+    
+    // HTTP route registration
+    pub fn get<F, Fut>(&self, path: &str, handler: F) -> &Self;
+    pub fn post<F, Fut>(&self, path: &str, handler: F) -> &Self;
+    pub fn put<F, Fut>(&self, path: &str, handler: F) -> &Self;
+    pub fn delete<F, Fut>(&self, path: &str, handler: F) -> &Self;
+    pub fn patch<F, Fut>(&self, path: &str, handler: F) -> &Self;
+
+    // Route-level middleware registration
+    pub fn get_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self where M: IntoMiddlewareChain<S>;
+    pub fn post_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self where M: IntoMiddlewareChain<S>;
+    pub fn put_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self where M: IntoMiddlewareChain<S>;
+    pub fn delete_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self where M: IntoMiddlewareChain<S>;
+    pub fn patch_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self where M: IntoMiddlewareChain<S>;
+
+    pub fn static_files(&self, route_path: &str, dir_path: &str) -> &Self;
+    pub async fn listen(self, port: u16) -> Result<()>;
+}
+```
+
+### Router (`Router<S>`)
+```rust
+pub struct Router<S = ()>;
+
+impl Router<()> {
+    pub fn new() -> Self;
+}
+
+impl<S: Send + Sync + 'static> Router<S> {
+    pub fn with_state() -> Self;
+    pub fn use_middleware<M, Fut>(&mut self, middleware: M) -> &mut Self;
+    pub fn r#use<M, Fut>(&mut self, middleware: M) -> &mut Self; // Alias for use_middleware
+
+    pub fn get<F, Fut>(&mut self, path: &str, handler: F) -> &mut Self;
+    pub fn post<F, Fut>(&mut self, path: &str, handler: F) -> &mut Self;
+    pub fn put<F, Fut>(&mut self, path: &str, handler: F) -> &mut Self;
+    pub fn delete<F, Fut>(&mut self, path: &str, handler: F) -> &mut Self;
+    pub fn patch<F, Fut>(&mut self, path: &str, handler: F) -> &mut Self;
+
+    pub fn get_with<M, H, Fut>(&mut self, path: &str, middlewares: M, handler: H) -> &mut Self where M: IntoMiddlewareChain<S>;
+    pub fn post_with<M, H, Fut>(&mut self, path: &str, middlewares: M, handler: H) -> &mut Self where M: IntoMiddlewareChain<S>;
+    pub fn put_with<M, H, Fut>(&mut self, path: &str, middlewares: M, handler: H) -> &mut Self where M: IntoMiddlewareChain<S>;
+    pub fn delete_with<M, H, Fut>(&mut self, path: &str, middlewares: M, handler: H) -> &mut Self where M: IntoMiddlewareChain<S>;
+    pub fn patch_with<M, H, Fut>(&mut self, path: &str, middlewares: M, handler: H) -> &mut Self where M: IntoMiddlewareChain<S>;
+
+    pub fn route<'a>(&'a mut self, path: &'a str) -> RouteBuilder<'a, S>;
+    pub fn mount(&mut self, prefix: &str, router: Router<S>) -> &mut Self;
+}
+```
+
+### Request (`Request<S>`)
+```rust
+pub struct Request<S = ()> {
+    pub state: Arc<S>,
+    // ...
+}
+
+impl<S> Request<S> {
+    pub fn method(&self) -> &Method;
+    pub fn path(&self) -> &str;
+    pub fn param(&self, key: &str) -> Option<&str>;
+    pub fn params(&self) -> &HashMap<String, String>;
+    pub fn query(&self, key: &str) -> Option<&str>;
+    pub fn queries(&self) -> &HashMap<String, String>;
+    pub fn header(&self, key: &str) -> Option<&str>;
+    pub fn headers(&self) -> &HashMap<String, String>;
+    pub fn bearer_token(&self) -> Option<&str>;
+    pub fn content_type(&self) -> Option<&str>;
+    pub async fn json<T: DeserializeOwned>(&mut self) -> Result<T>;
+    pub async fn body_string(&mut self) -> Result<String>;
+    pub async fn body_bytes(&mut self) -> Result<Bytes>;
+    pub fn state(&self) -> &S;
+}
+```
+
+### Response Builder
+```rust
+pub struct Response;
+
+impl Response {
+    pub fn new() -> Self;
+    pub fn status(self, code: u16) -> Self;
+    pub fn header(self, key: &str, value: &str) -> Self;
+    pub fn send(self, body: impl Into<String>) -> Result<Self>;
+    pub fn send_bytes(self, bytes: impl Into<Bytes>) -> Result<Self>;
+    pub fn html(self, body: impl Into<String>) -> Result<Self>;
+    pub fn json<T: Serialize>(self, data: T) -> Result<Self>;
+    pub fn cookie(self, name: &str, value: &str, options: CookieOptions) -> Self;
+    pub fn redirect(self, location: &str) -> Result<Self>;
+    pub fn cors(self, origin: &str) -> Self;
+}
+```
+
+---
+
+## 3. Middleware Architecture & Execution Lifecycle
+
+### Lifecycle Flow
+1. **Global Middlewares:** Run in FIFO order.
+2. **Router Middlewares:** Run in FIFO order for routes mounted under this router.
+3. **Route Middlewares:** Run in FIFO order for this specific route.
+4. **Terminal Handler:** Generates HTTP Response.
+5. **Unwind (Reverse LIFO):** Response passes back through route middlewares, router middlewares, and global middlewares.
+
+### Multiple Middlewares via Tuples
+`IntoMiddlewareChain<S>` is implemented for:
+- Single middleware: `mw`
+- Tuples of 2 to 8: `(mw1, mw2)`, `(mw1, mw2, mw3)`, etc.
+- Vector: `vec![mw1, mw2]`
+
+Example:
+```rust
+router.get_with("/protected", (require_auth, require_admin, audit_log), |req, res| async move {
+    res.json(serde_json::json!({"status": "ok"}))
+});
+```
+
+### Short-Circuiting Guarantee
+If a middleware returns a `Response` without calling `next(req, res).await`, all downstream middlewares and the terminal handler are bypassed immediately.
+
+---
+
+## 4. Critical Rust Gotchas for Developers and AI Agents
+
+### Gotcha A: The `.to_string()` vs `.as_str()` JSON Trap
+When parsing untyped JSON (`serde_json::Value`):
+- `val["username"].to_string()` produces `"\"alice\""` (WITH LITERAL QUOTES).
+- Searching SQL or MongoDB with `"\"alice\""` fails completely!
+- **CORRECT FIX:** Always use `val["username"].as_str()`, which returns `Option<&str>` (`Some("alice")` without quotes).
+- **BEST PRACTICE:** Use strongly typed structs with `#[derive(Deserialize)]` instead of `Value`.
+
+### Gotcha B: Database Connection Pools and the Mutex Trap
+- Connection pools (`sqlx::PgPool`, `mongodb::Database`, `redis::aio::ConnectionManager`) are ALREADY thread-safe smart pointers internally.
+- **NEVER** wrap them in a `Mutex` (e.g. `Arc<Mutex<PgPool>>`). Doing so forces the server to process all database queries serially, destroying concurrency.
+- Store them directly in your `AppState` struct with `#[derive(Clone)]`.
+
+### Gotcha C: Danger of `.unwrap()` in Production Handlers
+- If a header, query param, or JSON field is missing, `.unwrap()` panics and crashes the worker task.
+- Use safe alternatives:
+  - `req.param("id").unwrap_or("default")`
+  - `let Some(id) = req.param("id") else { return res.status(400).send("Missing ID"); };`
+
+### Gotcha D: Modern `let else` Syntax
+Prefer `let else` over nested `match` statements:
+```rust
+let Some(token) = req.bearer_token() else {
+    return res.status(401).json(serde_json::json!({"error": "Missing token"}));
+};
+```
+
+---
+
+## 5. Production Reference Template
+
+```rust
+use nitrox::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db_pool: sqlx::PgPool,
+    pub redis: redis::aio::ConnectionManager,
+}
+
+#[derive(Deserialize)]
+pub struct CreateUserDto {
+    pub username: String,
+    pub email: String,
+}
+
+pub async fn require_auth(
+    req: Request<AppState>,
+    res: Response,
+    next: Next<AppState>,
+) -> NitroxResult<Response> {
+    let Some(token) = req.bearer_token() else {
+        return res.status(401).json(serde_json::json!({
+            "error": "Unauthorized: Bearer token required"
+        }));
+    };
+
+    if token != "valid-token" {
+        return res.status(401).json(serde_json::json!({
+            "error": "Unauthorized: Invalid token"
+        }));
+    }
+
+    next(req, res).await
+}
+
+pub fn create_user_router() -> Router<AppState> {
+    let mut router = Router::with_state();
+
+    router.use_middleware(nitrox::middleware::logger());
+
+    router.get_with("/me", require_auth, |req, res| async move {
+        res.json(serde_json::json!({ "user": "current_authenticated_user" }))
+    });
+
+    router.post_with("/", require_auth, |mut req, res| async move {
+        let payload: CreateUserDto = req.json().await?;
+        res.status(201).json(serde_json::json!({ "created": payload.username }))
+    });
+
+    router
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize DB and Redis here...
+    // let state = AppState { db_pool, redis };
+    // let mut app = Nitrox::with_state(state);
+    // app.use_middleware(nitrox::middleware::helmet());
+    // app.mount("/api/v1/users", create_user_router());
+    // app.listen(3000).await?;
+    Ok(())
+}
+```
+

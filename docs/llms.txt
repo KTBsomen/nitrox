@@ -1,0 +1,58 @@
+# Nitrox
+
+> A high-performance, minimalist web framework for Rust inspired by ExpressJS, built on Hyper 1.x and Tokio.
+
+This file provides machine-readable context, architectural rules, and code generation instructions for AI coding assistants (Cursor, Claude, Copilot, ChatGPT).
+
+## Architectural Rules for AI Code Generation
+
+When generating Rust code that uses Nitrox, ALWAYS adhere to the following rules:
+
+### 1. Application State & Databases
+- Access state via `req.state` (or `req.state()`). DO NOT generate manual double-clones (`let db = db.clone()`) around route closures.
+- App state must implement `Clone + Send + Sync + 'static`.
+- NEVER wrap database connection pools (`sqlx::PgPool`, `mongodb::Client`, `mongodb::Database`, `redis::aio::ConnectionManager`) in a `Mutex`. These types are ALREADY thread-safe smart pointers with internal pooling. Wrapping them in a `Mutex` serializes requests and destroys concurrency.
+
+### 2. Route-Level & Router-Level Middlewares
+- For router-level middleware, call `router.use_middleware(mw)` or `router.r#use(mw)`. Multiple calls execute in strict FIFO order.
+- For route-level middleware, use `get_with`, `post_with`, `put_with`, `delete_with`, `patch_with`.
+  - Example: `router.get_with("/profile", require_auth, |req, res| async move { ... })`
+- For multiple middlewares on a single route, pass a tuple:
+  - Example: `router.get_with("/admin", (require_auth, require_admin), handler)`
+- Handlers MUST use closure parameter signatures that let rustc infer types: `|req, res| async move { ... }`.
+
+### 3. Critical Serde JSON Gotchas
+- When using `serde_json::Value`:
+  - `val["name"].to_string()` returns `"\"Alice\""` WITH LITERAL QUOTES. DO NOT use this for database queries or string comparisons.
+  - ALWAYS use `val["name"].as_str()` which returns `Option<&str>` (`Some("Alice")`).
+- Prefer strongly typed structs: `#[derive(serde::Deserialize)] struct MyPayload { ... }` and parse with `let body: MyPayload = req.json().await?;`.
+
+### 4. Error Handling and Modern Rust
+- Use `?` for operations returning `NitroxResult<T>` (e.g. `req.json().await?`).
+- For third-party errors (SQLx, Mongo, Redis), convert them via:
+  `.map_err(|e| NitroxError::Internal(e.to_string()))?` or map them to HTTP responses.
+- Prefer `let else` over nested `match` or dangerous `.unwrap()`:
+  `let Some(id) = req.param("id") else { return res.status(400).json(json!({"error": "Missing ID"})); };`
+
+### 5. Response Builder
+- Methods on `Response`:
+  - `res.status(200)`
+  - `res.json(serde_json::json!({...}))`
+  - `res.send("plain text")`
+  - `res.html("<h1>HTML</h1>")`
+  - `res.header("Header-Key", "Value")`
+  - `res.cookie("name", "val", CookieOptions::new().http_only(true))`
+  - `res.cors("*")`
+
+---
+
+## Documentation Index
+
+- [Beginner's Guide & Express Migration](BEGINNER_GUIDE.md): Complete tutorial, API reference for every function, Express-to-Rust conversion, and 7 beginner Rust gotchas.
+- [Middleware Master Guide](MIDDLEWARE.md): 4-tier middleware lifecycle, FIFO execution, tuples, and custom middleware recipes.
+- [Application State & Databases](STATE.md): Safe state sharing, connection pooling, and concurrency anti-patterns.
+- [Quick Start Guide](QUICKSTART.md): 5-minute setup and basic REST API.
+- [Multipart File Uploads](UPLOAD.md): Streaming file uploads and MIME validation.
+- [Production Deployment](DEPLOYMENT.md): Docker, systemd, reverse proxy (Caddy/Nginx) setup.
+- [Full Documentation Export (llms-full.txt)](llms-full.txt): Complete framework reference in a single text file.
+

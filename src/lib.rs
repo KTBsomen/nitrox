@@ -295,10 +295,10 @@ pub mod websocket;
 // Re-exports for convenience
 pub use app::{Nitrox, RustyX};
 pub use error::{Error, Result};
-pub use middleware::{Middleware, MiddlewareFn, Next};
+pub use middleware::{IntoMiddlewareChain, Middleware, MiddlewareFn, Next};
 pub use request::Request;
 pub use response::Response;
-pub use router::Router;
+pub use router::{RouteBuilder, Router};
 pub use static_files::{static_handler, StaticConfig};
 pub use upload::{UploadConfig, UploadedFile, Uploader};
 pub use websocket::{WsMessage, WsRoom, WsServer};
@@ -355,13 +355,13 @@ pub mod prelude {
     pub use crate::error::{Error, Result};
     pub use crate::middleware::{
         cors, cors_with_options, helmet, json, logger, rate_limiter, request_id, response_time,
-        simple_rate_limit, timeout, CorsOptions, JsonOptions, Middleware, MiddlewareFn, Next,
-        RateLimiterConfig,
+        simple_rate_limit, timeout, CorsOptions, IntoMiddlewareChain, JsonOptions, Middleware,
+        MiddlewareFn, Next, RateLimiterConfig,
     };
     pub use crate::models::Model;
     pub use crate::request::Request;
     pub use crate::response::{CookieOptions, Response};
-    pub use crate::router::Router;
+    pub use crate::router::{RouteBuilder, Router};
     pub use crate::static_files::{static_handler, StaticConfig};
     pub use crate::upload::{
         parse_boundary, parse_multipart, FileNaming, MultipartField, StorageType, UploadConfig,

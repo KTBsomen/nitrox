@@ -114,3 +114,135 @@ async fn test_app_with_state_instantiation() {
         res.json(json!({ "count": count, "service": req.state.service_name }))
     });
 }
+
+#[tokio::test]
+async fn test_middleware_hierarchy_and_fifo_ordering() {
+    use std::sync::Arc;
+
+    struct OrderTracker {
+        steps: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+    }
+
+    let tracker = OrderTracker {
+        steps: Arc::new(parking_lot::Mutex::new(Vec::new())),
+    };
+
+    let mut router = Router::<OrderTracker>::with_state();
+
+    // 1. Multiple router-level middlewares registered in sequence
+    let steps_r1 = Arc::clone(&tracker.steps);
+    router.use_middleware(move |req, res, next| {
+        let steps = Arc::clone(&steps_r1);
+        async move {
+            steps.lock().push("router_mw1_enter");
+            let res = next(req, res).await;
+            steps.lock().push("router_mw1_exit");
+            res
+        }
+    });
+
+    let steps_r2 = Arc::clone(&tracker.steps);
+    router.use_middleware(move |req, res, next| {
+        let steps = Arc::clone(&steps_r2);
+        async move {
+            steps.lock().push("router_mw2_enter");
+            let res = next(req, res).await;
+            steps.lock().push("router_mw2_exit");
+            res
+        }
+    });
+
+    // 2. Route-level middlewares in tuple: (route_mw1, route_mw2)
+    let steps_route1 = Arc::clone(&tracker.steps);
+    let route_mw1 = move |req, res, next: Next<OrderTracker>| {
+        let steps = Arc::clone(&steps_route1);
+        async move {
+            steps.lock().push("route_mw1_enter");
+            let res = next(req, res).await;
+            steps.lock().push("route_mw1_exit");
+            res
+        }
+    };
+
+    let steps_route2 = Arc::clone(&tracker.steps);
+    let route_mw2 = move |req, res, next: Next<OrderTracker>| {
+        let steps = Arc::clone(&steps_route2);
+        async move {
+            steps.lock().push("route_mw2_enter");
+            let res = next(req, res).await;
+            steps.lock().push("route_mw2_exit");
+            res
+        }
+    };
+
+    // 3. Register route with get_with using inline closure without type annotations:
+    router.get_with("/protected", (route_mw1, route_mw2), |req, res| async move {
+        req.state.steps.lock().push("handler");
+        res.send("success")
+    });
+
+    let steps_final = Arc::clone(&tracker.steps);
+
+    // Look up route
+    let (handler, _params) = router
+        .find_route(&hyper::Method::GET, "/protected")
+        .expect("Route /protected must be found");
+
+    // Execute handler
+    let req = Request::mock(hyper::Method::GET, "/protected", Arc::new(tracker));
+
+    let res = Response::new();
+    let response = handler(req, res).await;
+    assert_eq!(response.get_status(), hyper::StatusCode::OK);
+
+    // Verify exact FIFO execution order and LIFO unwinding
+    let expected = vec![
+        "router_mw1_enter",
+        "router_mw2_enter",
+        "route_mw1_enter",
+        "route_mw2_enter",
+        "handler",
+        "route_mw2_exit",
+        "route_mw1_exit",
+        "router_mw2_exit",
+        "router_mw1_exit",
+    ];
+    assert_eq!(*steps_final.lock(), expected);
+}
+
+#[tokio::test]
+async fn test_middleware_short_circuiting() {
+    use std::sync::Arc;
+
+    let mut router = Router::<()>::new();
+
+    // Failing auth guard that returns 401 without calling next()
+    let auth_guard_reject = |_req: Request<()>, res: Response, _next: Next<()>| async move {
+        res.status(401).send("Unauthorized")
+    };
+
+    let handler_executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let executed_clone = Arc::clone(&handler_executed);
+
+    router.get_with("/secure", auth_guard_reject, move |_req, res| {
+        let flag = Arc::clone(&executed_clone);
+        async move {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            res.send("should not be reached")
+        }
+    });
+
+    let (handler, _params) = router
+        .find_route(&hyper::Method::GET, "/secure")
+        .expect("Route /secure must be found");
+
+    let req = Request::mock_stateless(hyper::Method::GET, "/secure");
+
+    let res = Response::new();
+    let response = handler(req, res).await;
+
+    // Status must be 401 Unauthorized
+    assert_eq!(response.get_status(), hyper::StatusCode::UNAUTHORIZED);
+    // Handler must never have executed!
+    assert_eq!(handler_executed.load(std::sync::atomic::Ordering::SeqCst), false);
+}

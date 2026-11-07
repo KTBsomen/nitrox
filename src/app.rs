@@ -21,7 +21,7 @@
 //! ```
 
 use crate::error::Result;
-use crate::middleware::{MiddlewareFn, MiddlewareStack, Next};
+use crate::middleware::{IntoMiddlewareChain, MiddlewareFn, MiddlewareStack, Next};
 use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
@@ -322,6 +322,11 @@ impl<S: Send + Sync + 'static> Nitrox<S> {
         self
     }
 
+    /// Alias for `use_router`. Mounts a sub-router at a specific path prefix.
+    pub fn mount(&self, path: &str, router: Router<S>) -> &Self {
+        self.use_router(path, router)
+    }
+
     /// Register a GET route handler
     pub fn get<F, Fut>(&self, path: &str, handler: F) -> &Self
     where
@@ -365,6 +370,71 @@ impl<S: Send + Sync + 'static> Nitrox<S> {
         Fut: Future<Output = Response> + Send + 'static,
     {
         self.route(Method::PATCH, path, handler)
+    }
+
+    /// Register a GET route with route-level middleware(s).
+    pub fn get_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self
+    where
+        M: IntoMiddlewareChain<S>,
+        H: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
+        if let Ok(mut router) = self.router.write() {
+            router.get_with(path, middlewares, handler);
+        }
+        self
+    }
+
+    /// Register a POST route with route-level middleware(s).
+    pub fn post_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self
+    where
+        M: IntoMiddlewareChain<S>,
+        H: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
+        if let Ok(mut router) = self.router.write() {
+            router.post_with(path, middlewares, handler);
+        }
+        self
+    }
+
+    /// Register a PUT route with route-level middleware(s).
+    pub fn put_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self
+    where
+        M: IntoMiddlewareChain<S>,
+        H: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
+        if let Ok(mut router) = self.router.write() {
+            router.put_with(path, middlewares, handler);
+        }
+        self
+    }
+
+    /// Register a DELETE route with route-level middleware(s).
+    pub fn delete_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self
+    where
+        M: IntoMiddlewareChain<S>,
+        H: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
+        if let Ok(mut router) = self.router.write() {
+            router.delete_with(path, middlewares, handler);
+        }
+        self
+    }
+
+    /// Register a PATCH route with route-level middleware(s).
+    pub fn patch_with<M, H, Fut>(&self, path: &str, middlewares: M, handler: H) -> &Self
+    where
+        M: IntoMiddlewareChain<S>,
+        H: Fn(Request<S>, Response) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
+        if let Ok(mut router) = self.router.write() {
+            router.patch_with(path, middlewares, handler);
+        }
+        self
     }
 
     /// Internal method to register a route

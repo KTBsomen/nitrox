@@ -43,9 +43,28 @@ impl Request<()> {
     ) -> Result<Self> {
         Self::from_hyper_with_state(req, remote_addr, Arc::new(())).await
     }
+
+    /// Create a mock stateless request for unit testing.
+    pub fn mock_stateless(method: Method, path: &str) -> Self {
+        Self::mock(method, path, Arc::new(()))
+    }
 }
 
 impl<S> Request<S> {
+    /// Create a mock request with application state attached for unit testing.
+    pub fn mock(method: Method, path: &str, state: Arc<S>) -> Self {
+        Self {
+            method,
+            uri: path.parse().unwrap_or_default(),
+            version: Version::HTTP_11,
+            headers: HeaderMap::new(),
+            body: Bytes::new(),
+            params: HashMap::new(),
+            query: HashMap::new(),
+            remote_addr: "127.0.0.1:8080".parse().unwrap(),
+            state,
+        }
+    }
     /// Create a new Request from a hyper request with application state attached
     pub async fn from_hyper_with_state(
         req: hyper::Request<Incoming>,
