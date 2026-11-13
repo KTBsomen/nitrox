@@ -304,9 +304,9 @@ pub async fn request_logger<S: Send + Sync + 'static>(
 
 ---
 
-### 2. Authentication Guard with State
+### 2. Authentication Guard & Attaching Data (`req.set` and `req.must_get`)
 
-Directly inspect your database or JWT service through `req.state`:
+In Express, you write `req.user = user`. In Nitrox, attach any struct to the request using `req.set(user)` (or `req.set_custom_data(user)`), and read it downstream using `req.must_get::<T>()`:
 
 ```rust
 use nitrox::prelude::*;
@@ -315,8 +315,14 @@ pub struct AppState {
     pub jwt_secret: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct AuthUser {
+    pub id: u64,
+    pub username: String,
+}
+
 pub async fn require_auth(
-    req: Request<AppState>,
+    mut req: Request<AppState>,
     res: Response,
     next: Next<AppState>,
 ) -> Response {
@@ -328,6 +334,10 @@ pub async fn require_auth(
 
             // Validate against secret stored in state:
             if token == req.state.jwt_secret {
+                // Attach the authenticated user to the request:
+                let user = AuthUser { id: 101, username: "alice".to_string() };
+                req.set(user);
+
                 next(req, res).await
             } else {
                 res.status(401).json(json!({
@@ -340,6 +350,17 @@ pub async fn require_auth(
         })),
     }
 }
+
+// In your route handler:
+router.get_with("/me", require_auth, |req, res| async move {
+    // Direct reference with caller line tracking (zero unwraps, zero boilerplate):
+    let user = req.must_get::<AuthUser>();
+
+    res.json(json!({
+        "id": user.id,
+        "username": user.username
+    }))
+});
 ```
 
 ---

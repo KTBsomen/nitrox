@@ -7,7 +7,7 @@ use serde_json::json;
 
 #[allow(dead_code)]
 pub async fn require_auth(
-    req: Request<AppState>,
+    mut req: Request<AppState>,
     res: Response,
     next: Next<AppState>,
 ) -> Response {
@@ -15,7 +15,10 @@ pub async fn require_auth(
     match auth_header {
         Some(header_val) if header_val.starts_with("Bearer ") => {
             match req.state.auth_service.verify_token(header_val) {
-                Ok(_claims) => next(req, res).await,
+                Ok(claims) => {
+                    req.set(claims);
+                    next(req, res).await
+                }
                 Err(err) => err.to_response(res),
             }
         }

@@ -308,6 +308,9 @@ Every incoming request provides clean helper methods:
 | `req.json::<T>().await?` | `NitroxResult<T>` | Deserializes the request body directly into struct `T`. |
 | `req.body_string().await?` | `NitroxResult<String>` | Reads the request body as raw UTF-8 text. |
 | `req.body_bytes().await?` | `NitroxResult<Bytes>` | Reads raw binary request payload (useful for files or binary data). |
+| `req.set(value)` | `&mut Self` | Attaches custom data / extension to the request (like `req.user = user` in Express). Alias: `set_custom_data`. |
+| `req.must_get::<T>()` | `&T` | Retrieves mandatory custom data (panics with exact caller line if missing). Alias: `must_get_custom_data`. |
+| `req.get::<T>()` | `Option<&T>` | Retrieves optional custom data (returns `None` if missing). Alias: `get_custom_data`. |
 | `req.state` *(or `req.state()`)* | `&S` | Direct zero-clone access to your shared application state! |
 
 ---

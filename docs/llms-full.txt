@@ -104,6 +104,9 @@ impl<S> Request<S> {
     pub async fn body_string(&mut self) -> Result<String>;
     pub async fn body_bytes(&mut self) -> Result<Bytes>;
     pub fn state(&self) -> &S;
+    pub fn set<T: Clone + Send + Sync + 'static>(&mut self, val: T) -> &mut Self;
+    pub fn get<T: Send + Sync + 'static>(&self) -> Option<&T>;
+    pub fn must_get<T: Send + Sync + 'static>(&self) -> &T;
 }
 ```
 

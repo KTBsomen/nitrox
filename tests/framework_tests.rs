@@ -246,3 +246,78 @@ async fn test_middleware_short_circuiting() {
     // Handler must never have executed!
     assert_eq!(handler_executed.load(std::sync::atomic::Ordering::SeqCst), false);
 }
+
+#[tokio::test]
+async fn test_custom_data_propagation_and_cross_route_isolation() {
+    #[derive(Debug, Clone, PartialEq)]
+    struct AuthUser {
+        id: u64,
+        username: String,
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    struct AuditLog {
+        action: String,
+    }
+
+    let mut router = Router::<()>::new();
+
+    // Middleware 1: authenticates and sets AuthUser
+    let auth_mw = |mut req: Request<()>, res: Response, next: Next<()>| async move {
+        req.set(AuthUser {
+            id: 101,
+            username: "alice".to_string(),
+        });
+        next(req, res).await
+    };
+
+    // Middleware 2: downstream in chain, inspects AuthUser and sets AuditLog
+    let audit_mw = |mut req: Request<()>, res: Response, next: Next<()>| async move {
+        let user = req.must_get::<AuthUser>();
+        assert_eq!(user.id, 101);
+        req.set_custom_data(AuditLog {
+            action: format!("audited:{}", user.username),
+        });
+        next(req, res).await
+    };
+
+    // Route A: uses (auth_mw, audit_mw) tuple
+    router.get_with(
+        "/profile",
+        (auth_mw, audit_mw),
+        |req: Request<()>, res: Response| async move {
+            let user = req.must_get::<AuthUser>();
+            let audit = req.must_get_custom_data::<AuditLog>();
+
+            assert_eq!(user.id, 101);
+            assert_eq!(audit.action, "audited:alice");
+
+            res.send("success")
+        },
+    );
+
+    // Route B: public route without auth middleware
+    router.get("/public", |req: Request<()>, res: Response| async move {
+        // Must be None on Route B! No data pollution from Route A!
+        assert_eq!(req.get::<AuthUser>(), None);
+        assert_eq!(req.get_custom_data::<AuditLog>(), None);
+
+        res.send("public")
+    });
+
+    // 1. Execute Request A (hitting /profile)
+    let (handler_a, _) = router
+        .find_route(&hyper::Method::GET, "/profile")
+        .expect("Route /profile must be found");
+    let req_a = Request::mock_stateless(hyper::Method::GET, "/profile");
+    let res_a = handler_a(req_a, Response::new()).await;
+    assert_eq!(res_a.get_status(), hyper::StatusCode::OK);
+
+    // 2. Execute Request B (hitting /public)
+    let (handler_b, _) = router
+        .find_route(&hyper::Method::GET, "/public")
+        .expect("Route /public must be found");
+    let req_b = Request::mock_stateless(hyper::Method::GET, "/public");
+    let res_b = handler_b(req_b, Response::new()).await;
+    assert_eq!(res_b.get_status(), hyper::StatusCode::OK);
+}

@@ -29,13 +29,10 @@ impl AuthController {
     }
 
     pub async fn me(req: Request<AppState>, res: Response) -> Response {
-        // Read authorization header
-        let auth_header = req.header("authorization").unwrap_or_default();
-        match req.state.auth_service.verify_token(auth_header) {
-            Ok(claims) => match req.state.user_service.get_by_id(&claims.sub).await {
-                Ok(user) => ok(res, user),
-                Err(err) => err.to_response(res),
-            },
+        // Retrieve claims directly from request extensions set by require_auth middleware
+        let claims = req.must_get::<crate::models::AuthClaims>();
+        match req.state.user_service.get_by_id(&claims.sub).await {
+            Ok(user) => ok(res, user),
             Err(err) => err.to_response(res),
         }
     }

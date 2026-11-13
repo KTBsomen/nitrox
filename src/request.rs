@@ -7,6 +7,7 @@ use crate::error::{Error, Result};
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::body::{Body, Incoming};
+use hyper::http::Extensions;
 use hyper::{header::HeaderValue, HeaderMap, Method, Uri, Version};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -33,6 +34,8 @@ pub struct Request<S = ()> {
     /// configuration, and background channels without requiring closure captures
     /// or manual controller cloning.
     pub state: Arc<S>,
+    /// Request-scoped custom data / extensions map.
+    extensions: Extensions,
 }
 
 impl Request<()> {
@@ -63,6 +66,7 @@ impl<S> Request<S> {
             query: HashMap::new(),
             remote_addr: "127.0.0.1:8080".parse().unwrap(),
             state,
+            extensions: Extensions::new(),
         }
     }
     /// Create a new Request from a hyper request with application state attached
@@ -110,6 +114,7 @@ impl<S> Request<S> {
             query,
             remote_addr,
             state,
+            extensions: parts.extensions,
         })
     }
 
@@ -307,6 +312,92 @@ impl<S> Request<S> {
             .filter(|auth| auth.starts_with("Bearer "))
             .map(|auth| &auth[7..])
     }
+
+    // ========================================================================
+    // Custom Request Data / Extensions
+    // ========================================================================
+
+    /// Attach custom data or extension to the request.
+    ///
+    /// Values are stored by type (`TypeId`). Calling `set` with the same type
+    /// overwrites the previous value for this request.
+    pub fn set<T: Clone + Send + Sync + 'static>(&mut self, val: T) -> &mut Self {
+        self.extensions.insert(val);
+        self
+    }
+
+    /// Verbose alias for `set`. Attaches custom data to the request.
+    #[inline]
+    pub fn set_custom_data<T: Clone + Send + Sync + 'static>(&mut self, val: T) -> &mut Self {
+        self.set(val)
+    }
+
+    /// Retrieve an optional reference to custom data or an extension previously attached to the request.
+    ///
+    /// Returns `None` if the requested type has not been set.
+    pub fn get<T: Send + Sync + 'static>(&self) -> Option<&T> {
+        self.extensions.get::<T>()
+    }
+
+    /// Verbose alias for `get`.
+    #[inline]
+    pub fn get_custom_data<T: Send + Sync + 'static>(&self) -> Option<&T> {
+        self.get::<T>()
+    }
+
+    /// Retrieve an optional mutable reference to custom data or an extension.
+    pub fn get_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut T> {
+        self.extensions.get_mut::<T>()
+    }
+
+    /// Retrieve custom data or panic with a clear diagnostic message and the caller's exact file and line number.
+    ///
+    /// Use this in route handlers protected by middleware where the data is guaranteed to exist.
+    #[track_caller]
+    pub fn must_get<T: Send + Sync + 'static>(&self) -> &T {
+        self.get::<T>().unwrap_or_else(|| {
+            panic!(
+                "\n[Nitrox Error] Missing request extension `{}` on route `{} {}`.\n\
+                 Hint: Did you forget to attach the middleware (e.g. `get_with` / `post_with`) that calls `req.set(...)`?\n",
+                std::any::type_name::<T>(),
+                self.method,
+                self.path()
+            )
+        })
+    }
+
+    /// Verbose alias for `must_get`.
+    #[track_caller]
+    #[inline]
+    pub fn must_get_custom_data<T: Send + Sync + 'static>(&self) -> &T {
+        self.must_get::<T>()
+    }
+
+    /// Retrieve a mutable reference to custom data or panic with a clear diagnostic message.
+    #[track_caller]
+    pub fn must_get_mut<T: Send + Sync + 'static>(&mut self) -> &mut T {
+        let method = self.method.clone();
+        let path = self.path().to_string();
+        self.get_mut::<T>().unwrap_or_else(|| {
+            panic!(
+                "\n[Nitrox Error] Missing request extension `{}` on route `{} {}`.\n\
+                 Hint: Did you forget to attach the middleware (e.g. `get_with` / `post_with`) that calls `req.set(...)`?\n",
+                std::any::type_name::<T>(),
+                method,
+                path
+            )
+        })
+    }
+
+    /// Access the raw underlying `Extensions` map.
+    pub fn extensions(&self) -> &Extensions {
+        &self.extensions
+    }
+
+    /// Access a mutable reference to the raw underlying `Extensions` map.
+    pub fn extensions_mut(&mut self) -> &mut Extensions {
+        &mut self.extensions
+    }
 }
 
 #[cfg(test)]
@@ -325,6 +416,7 @@ mod tests {
             query: HashMap::new(),
             remote_addr: "127.0.0.1:8080".parse().unwrap(),
             state: Arc::new(()),
+            extensions: Extensions::new(),
         };
 
         assert_eq!(req.body_str().unwrap(), "{\"hello\":\"world\"}");
@@ -346,9 +438,78 @@ mod tests {
             query: HashMap::new(),
             remote_addr: "127.0.0.1:8080".parse().unwrap(),
             state: Arc::new(()),
+            extensions: Extensions::new(),
         };
 
         assert!(req.body_str().is_err());
         assert!(req.body_string().is_err());
+    }
+
+    #[derive(Debug, PartialEq, Clone)]
+    struct TestUser {
+        id: u64,
+        role: String,
+    }
+
+    #[derive(Debug, PartialEq, Clone)]
+    struct RequestTraceId(String);
+
+    #[test]
+    fn test_custom_data_set_get_and_separation() {
+        let mut req = Request::mock_stateless(Method::GET, "/api/test");
+
+        // Initially empty
+        assert_eq!(req.get::<TestUser>(), None);
+        assert_eq!(req.get_custom_data::<TestUser>(), None);
+
+        // Set TestUser
+        req.set(TestUser {
+            id: 42,
+            role: "admin".into(),
+        });
+
+        // Set RequestTraceId (different type, should not collide)
+        req.set_custom_data(RequestTraceId("trace-123".into()));
+
+        // Both accessible independently
+        assert_eq!(
+            req.get::<TestUser>(),
+            Some(&TestUser {
+                id: 42,
+                role: "admin".into()
+            })
+        );
+        assert_eq!(
+            req.must_get::<TestUser>(),
+            &TestUser {
+                id: 42,
+                role: "admin".into()
+            }
+        );
+        assert_eq!(
+            req.must_get_custom_data::<TestUser>(),
+            &TestUser {
+                id: 42,
+                role: "admin".into()
+            }
+        );
+        assert_eq!(
+            req.must_get::<RequestTraceId>(),
+            &RequestTraceId("trace-123".into())
+        );
+
+        // Mutable modification
+        if let Some(user) = req.get_mut::<TestUser>() {
+            user.role = "superadmin".into();
+        }
+        assert_eq!(req.must_get::<TestUser>().role, "superadmin");
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing request extension")]
+    fn test_must_get_panics_with_missing_extension() {
+        let req = Request::mock_stateless(Method::GET, "/api/users/me");
+        // Should panic with rich diagnostic message
+        let _ = req.must_get::<TestUser>();
     }
 }

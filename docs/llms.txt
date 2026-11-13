@@ -22,6 +22,7 @@ When generating Rust code that uses Nitrox, ALWAYS adhere to the following rules
 - For multiple middlewares on a single route, pass a tuple:
   - Example: `router.get_with("/admin", (require_auth, require_admin), handler)`
 - Handlers MUST use closure parameter signatures that let rustc infer types: `|req, res| async move { ... }`.
+- To pass data from middleware to downstream handlers (like `req.user` in Express), call `req.set(user)` in middleware. In route handlers, retrieve it via `req.must_get::<User>()` (mandatory) or `req.get::<User>()` (optional). Alias: `set_custom_data` / `must_get_custom_data`.
 
 ### 3. Critical Serde JSON Gotchas
 - When using `serde_json::Value`:
